@@ -6,6 +6,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import Schools from './components/Schools';
+import Students from './components/Students';
 import AuthService, { User } from './services/auth.service';
 
 const theme = createTheme({
@@ -62,6 +63,14 @@ const App: React.FC = () => {
             element={
               <ProtectedRoute requiredRoles={['super_admin']}>
                 <Schools />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/students"
+            element={
+              <ProtectedRoute requiredRoles={['super_admin']}>
+                <Students />
               </ProtectedRoute>
             }
           />

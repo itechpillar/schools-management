@@ -4,7 +4,7 @@
   "description": "Backend for Multi-School Management System",
   "main": "dist/server.js",
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "ts-node src/server.ts",
     "dev": "nodemon src/server.ts",
     "build": "tsc",
     "lint": "eslint . --ext .ts",
@@ -14,7 +14,8 @@
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:run": "npm run typeorm migration:run -- -d src/config/database.ts",
     "migration:revert": "npm run typeorm migration:revert -- -d src/config/database.ts",
-    "seed:users": "ts-node src/scripts/seedUsers.ts"
+    "seed:users": "ts-node src/scripts/seedUsers.ts",
+    "seed:schools": "ts-node src/scripts/seedSchools.ts"
   },
   "dependencies": {
     "@types/bcrypt": "^5.0.2",

@@ -12,13 +12,15 @@ import { UserRole } from '../models/User';
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(auth([UserRole.SUPER_ADMIN]));
+router.use(auth());
 
-// School routes
-router.post('/', createSchool);
+// Routes that require super admin
+router.post('/', auth([UserRole.SUPER_ADMIN]), createSchool);
+router.put('/:id', auth([UserRole.SUPER_ADMIN]), updateSchool);
+router.delete('/:id', auth([UserRole.SUPER_ADMIN]), deleteSchool);
+
+// Routes accessible to all authenticated users
 router.get('/', getAllSchools);
 router.get('/:id', getSchoolById);
-router.put('/:id', updateSchool);
-router.delete('/:id', deleteSchool);
 
 export default router;
