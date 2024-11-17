@@ -163,13 +163,18 @@ const Dashboard: React.FC = () => {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       
-      // Update stats with actual schools count
+      // Fetch students count
+      const studentsResponse = await axios.get('http://localhost:3001/api/students', {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      
+      // Update stats with actual schools and students count
       setStats(prevStats => ({
         ...prevStats,
         totalSchools: schoolsResponse.data.data.length || 0,
+        totalStudents: studentsResponse.data.data.length || 0,
         // For now, keeping other stats static until we implement their respective endpoints
         totalTeachers: 120,
-        totalStudents: 1250,
         activeClasses: 45
       }));
     } catch (error) {
@@ -194,8 +199,8 @@ const Dashboard: React.FC = () => {
 
   const menuItems = [
     { text: 'Schools', icon: <SchoolIcon />, path: '/schools', roles: ['super_admin'] },
+    { text: 'Students', icon: <PersonIcon />, path: '/students', roles: ['super_admin'] },
     { text: 'Teachers', icon: <PersonIcon />, path: '/teachers', roles: ['super_admin', 'school_admin'] },
-    { text: 'Students', icon: <PersonIcon />, path: '/students', roles: ['super_admin', 'school_admin', 'teacher'] },
     { text: 'Classes', icon: <ClassIcon />, path: '/classes', roles: ['super_admin', 'school_admin', 'teacher'] },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/reports', roles: ['super_admin', 'school_admin'] },
     { text: 'Events', icon: <EventIcon />, path: '/events', roles: ['super_admin', 'school_admin', 'teacher'] },

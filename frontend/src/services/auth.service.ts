@@ -52,13 +52,11 @@ class AuthService {
           token: response.data.data.token
         };
         localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('token', response.data.data.token);
         return userData;
       }
-      throw new Error('Invalid response data');
-    } catch (error: any) {
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      }
+      throw new Error('Invalid response format');
+    } catch (error) {
       throw error;
     }
   }
@@ -76,27 +74,27 @@ class AuthService {
           token: response.data.data.token
         };
         localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('token', response.data.data.token);
         return userData;
       }
-      throw new Error('Invalid response data');
-    } catch (error: any) {
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      }
+      throw new Error('Invalid response format');
+    } catch (error) {
       throw error;
     }
   }
 
   logout(): void {
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
   }
 
   getCurrentUser(): User | null {
     const userStr = localStorage.getItem('user');
-    if (userStr) {
+    const token = localStorage.getItem('token');
+    if (userStr && token) {
       try {
         const userData = JSON.parse(userStr);
-        if (this.isValidUser(userData)) {
+        if (this.isValidUser(userData) && userData.token === token) {
           return userData;
         }
         this.logout();
