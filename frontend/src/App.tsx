@@ -6,7 +6,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import Schools from './components/Schools';
-import AuthService from './services/auth.service';
+import AuthService, { User } from './services/auth.service';
 
 const theme = createTheme({
   palette: {
@@ -34,7 +34,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" />;
   }
 
-  if (requiredRoles.length > 0 && !requiredRoles.includes(user.user.role)) {
+  if (requiredRoles.length > 0 && !requiredRoles.includes(user.role)) {
     return <Navigate to="/dashboard" />;
   }
 
@@ -66,6 +66,7 @@ const App: React.FC = () => {
             }
           />
           <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>
       </Router>
     </ThemeProvider>
