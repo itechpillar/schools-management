@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { UserRole } from '../models/User';
+import { UserRole } from '../entities/User';
 import { AppError } from '../utils/appError';
 
 declare global {

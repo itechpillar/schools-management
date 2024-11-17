@@ -29,17 +29,36 @@ import {
 import api from '../services/api';
 import StudentForm from './StudentForm';
 
+interface StudentResponse {
+  id: number | string;
+  first_name?: string;
+  last_name?: string;
+  firstName?: string;
+  lastName?: string;
+  date_of_birth?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  school?: {
+    id: string | number;
+    name: string;
+  };
+  school_id?: string;
+  schoolId?: string;
+  grade?: string;
+  status?: 'active' | 'inactive';
+  school_name?: string;
+}
+
 interface Student {
   id: number | string;
   firstName: string;
   lastName: string;
-  email: string;
   dateOfBirth: string;
   gender: string;
   schoolId: string;
   grade: string;
   status: 'active' | 'inactive';
-  schoolName?: string;
+  schoolName: string;
 }
 
 interface School {
@@ -72,7 +91,18 @@ const Students: React.FC = () => {
   const fetchStudents = async () => {
     try {
       const response = await api.get('/students');
-      setStudents(response.data.data);
+      const studentsData: StudentResponse[] = Array.isArray(response.data.data) ? response.data.data : [];
+      setStudents(studentsData.map((student: StudentResponse): Student => ({
+        id: student.id,
+        firstName: student.firstName || student.first_name || '',
+        lastName: student.lastName || student.last_name || '',
+        dateOfBirth: student.dateOfBirth || student.date_of_birth || '',
+        gender: student.gender || '',
+        grade: student.grade || '',
+        schoolId: student.school?.id?.toString() || student.schoolId || student.school_id || '',
+        status: student.status || 'active',
+        schoolName: student.school?.name || student.school_name || 'N/A'
+      })));
     } catch (error) {
       console.error('Error fetching students:', error);
       setSnackbar({
@@ -80,6 +110,7 @@ const Students: React.FC = () => {
         message: 'Error fetching students',
         severity: 'error',
       });
+      setStudents([]);
     }
   };
 
@@ -157,12 +188,14 @@ const Students: React.FC = () => {
     }
   };
 
-  const filteredStudents = students.filter(
-    (student) =>
-      student.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredStudents = students.filter((student) => {
+    const searchTermLower = searchTerm.toLowerCase();
+    return (
+      (student?.firstName?.toLowerCase() || '').includes(searchTermLower) ||
+      (student?.lastName?.toLowerCase() || '').includes(searchTermLower) ||
+      (student?.grade?.toLowerCase() || '').includes(searchTermLower)
+    );
+  });
 
   const handlePageChange = (event: unknown, value: number) => {
     setPage(value);
@@ -215,7 +248,6 @@ const Students: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Name</TableCell>
-                <TableCell>Email</TableCell>
                 <TableCell>Date of Birth</TableCell>
                 <TableCell>Grade</TableCell>
                 <TableCell>School</TableCell>
@@ -229,7 +261,6 @@ const Students: React.FC = () => {
                   <TableCell>
                     {student.firstName} {student.lastName}
                   </TableCell>
-                  <TableCell>{student.email}</TableCell>
                   <TableCell>{student.dateOfBirth}</TableCell>
                   <TableCell>{student.grade}</TableCell>
                   <TableCell>{student.schoolName}</TableCell>

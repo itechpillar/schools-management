@@ -1,0 +1,48 @@
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Student } from './Student';
+
+@Entity('student_emergency_contacts')
+export class StudentEmergencyContact {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @OneToOne(() => Student)
+  @JoinColumn({ name: 'student_id' })
+  student: Student;
+
+  @Column()
+  student_id: string;
+
+  @Column()
+  contact_name: string;
+
+  @Column()
+  relationship: string;
+
+  @Column()
+  phone_number: string;
+
+  @Column({ nullable: true })
+  email: string;
+
+  @Column()
+  home_address: string;
+
+  @Column({ nullable: true })
+  alternate_contact_name: string;
+
+  @Column({ nullable: true })
+  alternate_contact_relationship: string;
+
+  @Column({ nullable: true })
+  alternate_contact_number: string;
+
+  @Column({ nullable: true })
+  communication_preference: string;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+}

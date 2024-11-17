@@ -159,26 +159,37 @@ const Dashboard: React.FC = () => {
     try {
       setLoading(true);
       // Fetch schools count
+      console.log('Fetching schools with token:', user.token);
       const schoolsResponse = await axios.get('http://localhost:3001/api/schools', {
         headers: { Authorization: `Bearer ${user.token}` },
       });
+      console.log('Schools response:', schoolsResponse.data);
       
       // Fetch students count
       const studentsResponse = await axios.get('http://localhost:3001/api/students', {
         headers: { Authorization: `Bearer ${user.token}` },
       });
+      console.log('Students response:', studentsResponse.data);
       
       // Update stats with actual schools and students count
+      const schoolsCount = schoolsResponse.data.data?.length || 0;
+      const studentsCount = studentsResponse.data.data?.length || 0;
+      console.log('Schools count:', schoolsCount);
+      console.log('Students count:', studentsCount);
+      
       setStats(prevStats => ({
         ...prevStats,
-        totalSchools: schoolsResponse.data.data.length || 0,
-        totalStudents: studentsResponse.data.data.length || 0,
+        totalSchools: schoolsCount,
+        totalStudents: studentsCount,
         // For now, keeping other stats static until we implement their respective endpoints
         totalTeachers: 120,
         activeClasses: 45
       }));
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Response data:', error.response?.data);
+      }
     } finally {
       setLoading(false);
     }

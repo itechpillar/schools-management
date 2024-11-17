@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { auth } from '../middleware/auth';
-import { UserRole } from '../models/User';
+import { UserRole } from '../entities/User';
 
 const router = Router();
 

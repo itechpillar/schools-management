@@ -1,5 +1,5 @@
 import AppDataSource from "../config/database";
-import { School } from "../models/School";
+import { School } from "../entities/School";
 
 const schools = [
   {

@@ -51,6 +51,7 @@ interface StudentFormData {
   gender: string;
   studentId?: string;
   photograph?: string;
+  schoolId: string;
 
   // Contact Details
   email: string;
@@ -68,7 +69,6 @@ interface StudentFormData {
 
   // Academic Information
   grade: string;
-  schoolId: string;
   section?: string;
   rollNumber?: string;
   previousSchool?: string;
@@ -138,15 +138,31 @@ export const StudentForm: React.FC<StudentFormProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [formData, setFormData] = useState<StudentFormData>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    dateOfBirth: '',
-    gender: '',
-    grade: '',
-    schoolId: '',
-    status: 'active',
+    firstName: editingStudent?.firstName || '',
+    lastName: editingStudent?.lastName || '',
+    email: editingStudent?.email || '',
+    dateOfBirth: editingStudent?.dateOfBirth || '',
+    gender: editingStudent?.gender || '',
+    grade: editingStudent?.grade || '',
+    schoolId: editingStudent?.schoolId || '',
+    status: editingStudent?.status || 'active',
   });
+
+  useEffect(() => {
+    if (editingStudent) {
+      setFormData({
+        firstName: editingStudent.firstName || '',
+        lastName: editingStudent.lastName || '',
+        email: editingStudent.email || '',
+        dateOfBirth: editingStudent.dateOfBirth || '',
+        gender: editingStudent.gender || '',
+        grade: editingStudent.grade || '',
+        schoolId: editingStudent.schoolId || '',
+        status: editingStudent.status || 'active',
+        ...editingStudent,
+      });
+    }
+  }, [editingStudent]);
 
   const [immunizationForm, setImmunizationForm] = useState<ImmunizationRecord>({
     vaccineName: '',
@@ -285,8 +301,45 @@ export const StudentForm: React.FC<StudentFormProps> = ({
     }));
   };
 
+  const validateForm = () => {
+    if (!formData.firstName?.trim()) {
+      alert('First Name is required');
+      return false;
+    }
+    if (!formData.lastName?.trim()) {
+      alert('Last Name is required');
+      return false;
+    }
+    if (!formData.dateOfBirth) {
+      alert('Date of Birth is required');
+      return false;
+    }
+    if (!formData.gender) {
+      alert('Gender is required');
+      return false;
+    }
+    if (!formData.schoolId) {
+      alert('School is required');
+      return false;
+    }
+    if (!formData.grade?.trim()) {
+      alert('Grade is required');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = () => {
-    handleSave(formData);
+    if (validateForm()) {
+      const submissionData = {
+        ...formData,
+        // Ensure all required fields are strings and trimmed
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        grade: formData.grade.trim(),
+      };
+      handleSave(submissionData);
+    }
   };
 
   return (
@@ -433,6 +486,22 @@ export const StudentForm: React.FC<StudentFormProps> = ({
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>School</InputLabel>
+                <Select
+                  name="schoolId"
+                  value={formData.schoolId}
+                  onChange={handleSelectChange}
+                >
+                  {schools.map((school) => (
+                    <MenuItem key={school.id} value={school.id}>
+                      {school.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
           </Grid>
         </TabPanel>
 
@@ -492,23 +561,6 @@ export const StudentForm: React.FC<StudentFormProps> = ({
         {/* Academic Information */}
         <TabPanel value={activeTab} index={2}>
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>School</InputLabel>
-                <Select
-                  name="schoolId"
-                  value={formData.schoolId}
-                  onChange={handleSelectChange}
-                  required
-                >
-                  {schools.map((school) => (
-                    <MenuItem key={school.id} value={school.id}>
-                      {school.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth

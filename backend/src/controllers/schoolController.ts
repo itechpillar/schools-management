@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import AppDataSource from '../config/database';
-import { School } from '../models/School';
+import { School } from '../entities/School';
 
 const schoolRepository = AppDataSource.getRepository(School);
 
@@ -36,8 +36,10 @@ export const createSchool = async (req: Request, res: Response) => {
 export const getAllSchools = async (_req: Request, res: Response) => {
   try {
     console.log('Fetching all schools...');
+    console.log('User from request:', _req.user); // Log the authenticated user
     const schools = await schoolRepository.find();
-    console.log('Schools fetched:', schools);
+    console.log('Number of schools found:', schools.length);
+    console.log('Schools data:', JSON.stringify(schools, null, 2));
     return res.status(200).json({
       status: 'success',
       data: schools,
