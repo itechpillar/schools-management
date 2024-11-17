@@ -1,56 +1,190 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import AuthService from '../services/auth.service';
+import { styled } from '@mui/material/styles';
 import {
-  AppBar,
   Box,
-  CssBaseline,
   Drawer,
-  IconButton,
+  AppBar,
+  Toolbar,
   List,
+  Typography,
+  Divider,
+  IconButton,
   ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
-  Toolbar,
-  Typography,
-  Container,
   Paper,
   Grid,
-  Button,
+  Card,
+  CardContent,
+  Avatar,
+  Chip,
+  Container,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
+  ChevronLeft as ChevronLeftIcon,
   School as SchoolIcon,
   Person as PersonIcon,
-  LocalHospital as HealthIcon,
-  Assignment as AssignmentIcon,
-  ExitToApp as LogoutIcon,
+  Class as ClassIcon,
+  Assessment as AssessmentIcon,
+  Event as EventIcon,
+  Notifications as NotificationsIcon,
+  AccountCircle as AccountCircleIcon,
   Dashboard as DashboardIcon,
+  ExitToApp as LogoutIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
+import AuthService, { User } from '../services/auth.service';
+import axios from 'axios';
+
+interface MenuItem {
+  text: string;
+  icon: JSX.Element;
+  path: string;
+  roles: string[];
+}
+
+interface DashboardStats {
+  totalSchools: number;
+  totalTeachers: number;
+  totalStudents: number;
+  activeClasses: number;
+}
 
 const drawerWidth = 240;
 
+const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })<{
+  open?: boolean;
+}>(({ theme, open }) => ({
+  flexGrow: 1,
+  padding: theme.spacing(3),
+  transition: theme.transitions.create('margin', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  marginLeft: `-${drawerWidth}px`,
+  ...(open && {
+    transition: theme.transitions.create('margin', {
+      easing: theme.transitions.easing.easeOut,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+    marginLeft: 0,
+  }),
+}));
+
+const StyledAppBar = styled(AppBar, {
+  shouldForwardProp: (prop) => prop !== 'open',
+})<{ open?: boolean }>(({ theme, open }) => ({
+  transition: theme.transitions.create(['margin', 'width'], {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  ...(open && {
+    width: `calc(100% - ${drawerWidth}px)`,
+    marginLeft: `${drawerWidth}px`,
+    transition: theme.transitions.create(['margin', 'width'], {
+      easing: theme.transitions.easing.easeOut,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+  }),
+}));
+
+const DrawerHeader = styled('div')(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  padding: theme.spacing(0, 1),
+  ...theme.mixins.toolbar,
+  justifyContent: 'flex-end',
+}));
+
+const StyledDrawer = styled(Drawer)(({ theme }) => ({
+  width: drawerWidth,
+  flexShrink: 0,
+  '& .MuiDrawer-paper': {
+    width: drawerWidth,
+    boxSizing: 'border-box',
+    backgroundColor: theme.palette.primary.main,
+    color: 'white',
+  },
+}));
+
+const StyledListItem = styled(ListItem)(({ theme }) => ({
+  '& .MuiListItemButton-root': {
+    borderRadius: theme.spacing(1),
+    margin: theme.spacing(0.5, 1),
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+  },
+  '& .MuiListItemIcon-root': {
+    color: 'white',
+  },
+}));
+
+const QuickStatsCard = styled(Paper)(({ theme }) => ({
+  height: '100%',
+  backgroundColor: theme.palette.background.default,
+  transition: 'transform 0.3s ease-in-out',
+  '&:hover': {
+    transform: 'translateY(-5px)',
+    boxShadow: theme.shadows[8],
+  },
+}));
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const user = AuthService.getCurrentUser();
+  const [open, setOpen] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalSchools: 0,
+    totalTeachers: 0,
+    totalStudents: 0,
+    activeClasses: 0
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userData = AuthService.getCurrentUser();
-    console.log('User Data:', userData);
-    if (!userData || !userData.user) {
+    const user = AuthService.getCurrentUser();
+    if (!user) {
       navigate('/login');
       return;
     }
+    setCurrentUser(user);
+    fetchDashboardStats(user);
   }, [navigate]);
 
-  if (!user || !user.user) {
-    navigate('/login');
-    return null;
-  }
+  const fetchDashboardStats = async (user: User) => {
+    try {
+      setLoading(true);
+      // Fetch schools count
+      const schoolsResponse = await axios.get('http://localhost:3001/api/schools', {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      
+      // Update stats with actual schools count
+      setStats(prevStats => ({
+        ...prevStats,
+        totalSchools: schoolsResponse.data.data.length || 0,
+        // For now, keeping other stats static until we implement their respective endpoints
+        totalTeachers: 120,
+        totalStudents: 1250,
+        activeClasses: 45
+      }));
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
+  const handleDrawerOpen = () => {
+    setOpen(true);
+  };
+
+  const handleDrawerClose = () => {
+    setOpen(false);
   };
 
   const handleLogout = () => {
@@ -58,189 +192,188 @@ const Dashboard: React.FC = () => {
     navigate('/login');
   };
 
-  const getMenuItems = () => {
-    const menuItems = [
-      { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    ];
+  const menuItems = [
+    { text: 'Schools', icon: <SchoolIcon />, path: '/schools', roles: ['super_admin'] },
+    { text: 'Teachers', icon: <PersonIcon />, path: '/teachers', roles: ['super_admin', 'school_admin'] },
+    { text: 'Students', icon: <PersonIcon />, path: '/students', roles: ['super_admin', 'school_admin', 'teacher'] },
+    { text: 'Classes', icon: <ClassIcon />, path: '/classes', roles: ['super_admin', 'school_admin', 'teacher'] },
+    { text: 'Reports', icon: <AssessmentIcon />, path: '/reports', roles: ['super_admin', 'school_admin'] },
+    { text: 'Events', icon: <EventIcon />, path: '/events', roles: ['super_admin', 'school_admin', 'teacher'] },
+  ];
 
-    switch (user.user.role) {
-      case 'super_admin':
-        menuItems.push(
-          { text: 'Schools', icon: <SchoolIcon />, path: '/schools' },
-          { text: 'Users', icon: <PersonIcon />, path: '/users' }
-        );
-        break;
-      case 'school_admin':
-        menuItems.push(
-          { text: 'Teachers', icon: <PersonIcon />, path: '/teachers' },
-          { text: 'Students', icon: <PersonIcon />, path: '/students' },
-          { text: 'Health Staff', icon: <HealthIcon />, path: '/health-staff' }
-        );
-        break;
-      case 'teacher':
-        menuItems.push(
-          { text: 'Students', icon: <PersonIcon />, path: '/students' },
-          { text: 'Assignments', icon: <AssignmentIcon />, path: '/assignments' }
-        );
-        break;
-      case 'health_staff':
-        menuItems.push(
-          { text: 'Health Records', icon: <HealthIcon />, path: '/health-records' },
-          { text: 'Students', icon: <PersonIcon />, path: '/students' }
-        );
-        break;
-      case 'student':
-        menuItems.push(
-          { text: 'Assignments', icon: <AssignmentIcon />, path: '/assignments' },
-          { text: 'Health Records', icon: <HealthIcon />, path: '/my-health-records' }
-        );
-        break;
-      case 'parent':
-        menuItems.push(
-          { text: 'Children', icon: <PersonIcon />, path: '/children' },
-          { text: 'Health Records', icon: <HealthIcon />, path: '/children-health-records' }
-        );
-        break;
-    }
-    console.log('Menu Items:', menuItems);
-    return menuItems;
-  };
+  const quickStats = [
+    { title: 'Total Schools', value: loading ? '...' : stats.totalSchools.toString(), icon: <SchoolIcon sx={{ fontSize: 40 }} />, color: '#1976d2' },
+    { title: 'Active Teachers', value: loading ? '...' : stats.totalTeachers.toString(), icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#2e7d32' },
+    { title: 'Total Students', value: loading ? '...' : stats.totalStudents.toString(), icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#ed6c02' },
+    { title: 'Ongoing Classes', value: loading ? '...' : stats.activeClasses.toString(), icon: <ClassIcon sx={{ fontSize: 40 }} />, color: '#9c27b0' },
+  ];
 
-  const drawer = (
-    <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          School Management
-        </Typography>
-      </Toolbar>
-      <List>
-        {getMenuItems().map((item) => (
-          <ListItem key={item.text} onClick={() => navigate(item.path)} component="button">
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
-        <ListItem onClick={handleLogout} component="button">
-          <ListItemIcon>
-            <LogoutIcon />
-          </ListItemIcon>
-          <ListItemText primary="Logout" />
-        </ListItem>
-      </List>
-    </div>
-  );
+  const recentActivities = [
+    { type: 'New Student', message: 'John Doe joined Class 10A', time: '2 hours ago' },
+    { type: 'Event', message: 'Annual Sports Day scheduled for next month', time: '5 hours ago' },
+    { type: 'Report', message: 'Monthly attendance report generated', time: '1 day ago' },
+  ];
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <CssBaseline />
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
-        }}
-      >
+      <StyledAppBar position="fixed" open={open}>
         <Toolbar>
           <IconButton
             color="inherit"
             aria-label="open drawer"
+            onClick={handleDrawerOpen}
             edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+            sx={{ mr: 2, ...(open && { display: 'none' }) }}
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            Welcome, {user.user.firstName} {user.user.lastName}
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+            School Management System
           </Typography>
+          <IconButton color="inherit" sx={{ mr: 2 }}>
+            <NotificationsIcon />
+          </IconButton>
+          <IconButton color="inherit">
+            <AccountCircleIcon />
+          </IconButton>
         </Toolbar>
-      </AppBar>
-      <Box
-        component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+      </StyledAppBar>
+
+      <StyledDrawer
+        variant="persistent"
+        anchor="left"
+        open={open}
       >
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true,
-          }}
-          sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: drawerWidth,
-            },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: drawerWidth,
-            },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
-      </Box>
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-        }}
-      >
-        <Toolbar />
-        <Container maxWidth="lg">
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Paper
-                sx={{
-                  p: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  height: 240,
-                }}
-              >
-                <Typography variant="h4" gutterBottom>
-                  {user.user.role === 'super_admin'
-                    ? 'System Overview'
-                    : user.user.role === 'school_admin'
-                    ? 'School Overview'
-                    : user.user.role === 'teacher'
-                    ? 'Class Overview'
-                    : user.user.role === 'health_staff'
-                    ? 'Health Records Overview'
-                    : user.user.role === 'student'
-                    ? 'Student Dashboard'
-                    : 'Parent Dashboard'}
-                </Typography>
-                <Typography variant="body1" paragraph>
-                  Welcome to your dashboard. Use the menu on the left to navigate through
-                  different sections based on your role.
-                </Typography>
-                <Box sx={{ mt: 2 }}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => navigate(getMenuItems()[1]?.path || '/dashboard')}
-                  >
-                    View {getMenuItems()[1]?.text || 'Dashboard'}
-                  </Button>
-                </Box>
-              </Paper>
-            </Grid>
+        <DrawerHeader>
+          <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', px: 2 }}>
+            <SchoolIcon sx={{ mr: 1 }} />
+            <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+              SMS
+            </Typography>
+            <IconButton onClick={handleDrawerClose} sx={{ color: 'white' }}>
+              <ChevronLeftIcon />
+            </IconButton>
+          </Box>
+        </DrawerHeader>
+        <Divider sx={{ backgroundColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <Box sx={{ px: 2, py: 2 }}>
+          <Chip
+            avatar={<Avatar>{currentUser?.first_name?.charAt(0) || 'U'}</Avatar>}
+            label={currentUser?.role?.replace('_', ' ').toUpperCase() || 'USER'}
+            sx={{ 
+              width: '100%', 
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: 'white',
+              '& .MuiChip-avatar': {
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+              }
+            }}
+          />
+        </Box>
+        <List>
+          {menuItems.map((item) => (
+            item.roles.includes(currentUser?.role || '') && (
+              <StyledListItem key={item.text} disablePadding>
+                <ListItemButton onClick={() => navigate(item.path)}>
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItemButton>
+              </StyledListItem>
+            )
+          ))}
+          <StyledListItem key="logout" disablePadding>
+            <ListItemButton onClick={handleLogout}>
+              <ListItemIcon>
+                <LogoutIcon />
+              </ListItemIcon>
+              <ListItemText primary="Logout" />
+            </ListItemButton>
+          </StyledListItem>
+        </List>
+      </StyledDrawer>
+
+      <Main open={open}>
+        <DrawerHeader />
+        <Grid container spacing={3}>
+          {/* Welcome Section */}
+          <Grid item xs={12}>
+            <Paper 
+              sx={{ 
+                p: 3, 
+                background: 'linear-gradient(45deg, #1976d2 30%, #2196f3 90%)',
+                color: 'white',
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="h4" gutterBottom>
+                Welcome back, {currentUser?.first_name || 'User'}!
+              </Typography>
+              <Typography variant="subtitle1">
+                Here's what's happening in your school today
+              </Typography>
+            </Paper>
           </Grid>
-        </Container>
-      </Box>
+
+          {/* Quick Stats */}
+          {quickStats.map((stat, index) => (
+            <Grid item xs={12} sm={6} md={3} key={index}>
+              <QuickStatsCard>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar 
+                      sx={{ 
+                        bgcolor: stat.color,
+                        width: 56,
+                        height: 56,
+                        mr: 2
+                      }}
+                    >
+                      {stat.icon}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h4" component="div">
+                        {stat.value}
+                      </Typography>
+                      <Typography color="text.secondary">
+                        {stat.title}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </QuickStatsCard>
+            </Grid>
+          ))}
+
+          {/* Recent Activities */}
+          <Grid item xs={12}>
+            <Paper sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Recent Activities
+              </Typography>
+              <List>
+                {recentActivities.map((activity, index) => (
+                  <ListItem 
+                    key={index}
+                    sx={{
+                      borderLeft: '4px solid',
+                      borderColor: index === 0 ? '#1976d2' : index === 1 ? '#2e7d32' : '#ed6c02',
+                      mb: 1,
+                      backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                      borderRadius: 1,
+                    }}
+                  >
+                    <ListItemText
+                      primary={activity.message}
+                      secondary={activity.time}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Main>
     </Box>
   );
 };
