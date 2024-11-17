@@ -6,10 +6,6 @@ import {
   Typography,
   Button,
   TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Table,
   TableBody,
   TableCell,
@@ -21,10 +17,6 @@ import {
   Alert,
   Box,
   Pagination,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Breadcrumbs,
   Link,
 } from '@mui/material';
@@ -35,9 +27,10 @@ import {
   ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import api from '../services/api';
+import StudentForm from './StudentForm';
 
 interface Student {
-  id: number;
+  id: number | string;
   firstName: string;
   lastName: string;
   email: string;
@@ -57,12 +50,6 @@ interface School {
   email: string;
 }
 
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-}
-
 const Students: React.FC = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
@@ -71,21 +58,11 @@ const Students: React.FC = () => {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [alertOpen, setAlertOpen] = useState(false);
-  const [alertMessage, setAlertMessage] = useState('');
-  const [alertSeverity, setAlertSeverity] = useState<'success' | 'error'>('success');
-  const [formData, setFormData] = useState<Partial<Student>>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    dateOfBirth: '',
-    gender: '',
-    schoolId: '',
-    grade: '',
-    status: 'active',
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' as 'success' | 'error',
   });
-
-  const rowsPerPage = 10;
 
   useEffect(() => {
     fetchStudents();
@@ -94,39 +71,28 @@ const Students: React.FC = () => {
 
   const fetchStudents = async () => {
     try {
-      const response = await api.get<ApiResponse<Student[]>>('/students');
-      setStudents(response.data.data || []);
+      const response = await api.get('/students');
+      setStudents(response.data.data);
     } catch (error) {
       console.error('Error fetching students:', error);
-      setAlertSeverity('error');
-      setAlertMessage('Error fetching students');
-      setAlertOpen(true);
-      setStudents([]);
+      setSnackbar({
+        open: true,
+        message: 'Error fetching students',
+        severity: 'error',
+      });
     }
   };
 
   const fetchSchools = async () => {
     try {
-      const response = await api.get<ApiResponse<School[]>>('/schools');
-      console.log('Schools response:', response.data);
-      setSchools(response.data.data || []);
+      const response = await api.get('/schools');
+      setSchools(response.data.data);
     } catch (error) {
       console.error('Error fetching schools:', error);
-      setSchools([]);
     }
   };
 
   const handleClickOpen = () => {
-    setFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      dateOfBirth: '',
-      gender: '',
-      schoolId: '',
-      grade: '',
-      status: 'active',
-    });
     setEditingStudent(null);
     setOpen(true);
   };
@@ -136,93 +102,95 @@ const Students: React.FC = () => {
     setEditingStudent(null);
   };
 
-  const handleEdit = (student: Student) => {
-    const formattedStudent = {
-      ...student,
-      dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth).toISOString().split('T')[0] : ''
-    };
-    setEditingStudent(student);
-    setFormData(formattedStudent);
-    setOpen(true);
-  };
-
-  const sortedStudents = [...students].sort((a, b) => {
-    return a.firstName.localeCompare(b.firstName);
-  });
-
-  const filteredStudents = sortedStudents.filter((student) => {
-    const searchString = searchTerm.toLowerCase();
-    return (
-      student.firstName.toLowerCase().includes(searchString) ||
-      student.lastName.toLowerCase().includes(searchString) ||
-      student.email.toLowerCase().includes(searchString)
-    );
-  });
-
-  const paginatedStudents = filteredStudents.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (formData: any) => {
     try {
       if (editingStudent) {
-        await api.put(
-          `/students/${editingStudent.id}`,
-          formData
-        );
+        await api.put(`/students/${editingStudent.id}`, formData);
+        setSnackbar({
+          open: true,
+          message: 'Student updated successfully',
+          severity: 'success',
+        });
       } else {
         await api.post('/students', formData);
+        setSnackbar({
+          open: true,
+          message: 'Student added successfully',
+          severity: 'success',
+        });
       }
-      setAlertSeverity('success');
-      setAlertMessage(
-        editingStudent ? 'Student updated successfully' : 'Student added successfully'
-      );
-      setAlertOpen(true);
       handleClose();
       fetchStudents();
     } catch (error) {
       console.error('Error saving student:', error);
-      setAlertSeverity('error');
-      setAlertMessage('Error saving student');
-      setAlertOpen(true);
+      setSnackbar({
+        open: true,
+        message: `Error ${editingStudent ? 'updating' : 'adding'} student`,
+        severity: 'error',
+      });
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleEdit = (student: Student) => {
+    setEditingStudent(student);
+    setOpen(true);
+  };
+
+  const handleDelete = async (id: number | string) => {
     if (window.confirm('Are you sure you want to delete this student?')) {
       try {
         await api.delete(`/students/${id}`);
-        setAlertSeverity('success');
-        setAlertMessage('Student deleted successfully');
-        setAlertOpen(true);
+        setSnackbar({
+          open: true,
+          message: 'Student deleted successfully',
+          severity: 'success',
+        });
         fetchStudents();
       } catch (error) {
         console.error('Error deleting student:', error);
-        setAlertSeverity('error');
-        setAlertMessage('Error deleting student');
-        setAlertOpen(true);
+        setSnackbar({
+          open: true,
+          message: 'Error deleting student',
+          severity: 'error',
+        });
       }
     }
   };
+
+  const filteredStudents = students.filter(
+    (student) =>
+      student.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handlePageChange = (event: unknown, value: number) => {
+    setPage(value);
+  };
+
+  const studentsPerPage = 10;
+  const totalPages = Math.ceil(filteredStudents.length / studentsPerPage);
+  const displayedStudents = filteredStudents.slice(
+    (page - 1) * studentsPerPage,
+    page * studentsPerPage
+  );
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
-          <Link
-            component="button"
-            variant="body1"
-            onClick={() => navigate('/dashboard')}
-            sx={{ display: 'flex', alignItems: 'center' }}
-          >
-            <ArrowBackIcon sx={{ mr: 0.5 }} fontSize="small" />
-            Dashboard
-          </Link>
-          <Typography color="text.primary">Students Management</Typography>
-        </Breadcrumbs>
+          <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+            <Link
+              component="button"
+              variant="body1"
+              onClick={() => navigate('/dashboard')}
+              sx={{ display: 'flex', alignItems: 'center' }}
+            >
+              <ArrowBackIcon sx={{ mr: 0.5 }} fontSize="small" />
+              Dashboard
+            </Link>
+            <Typography color="text.primary">Students Management</Typography>
+          </Breadcrumbs>
           <Button
             variant="contained"
             color="primary"
@@ -232,6 +200,7 @@ const Students: React.FC = () => {
             Add Student
           </Button>
         </Box>
+
         <TextField
           label="Search Students"
           variant="outlined"
@@ -242,201 +211,80 @@ const Students: React.FC = () => {
         />
 
         <TableContainer>
-          <Table size="small">
+          <Table>
             <TableHead>
               <TableRow>
-                <TableCell>First Name</TableCell>
-                <TableCell>Last Name</TableCell>
+                <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
-                <TableCell>School</TableCell>
+                <TableCell>Date of Birth</TableCell>
                 <TableCell>Grade</TableCell>
+                <TableCell>School</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell align="right">Actions</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedStudents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    <Typography variant="body1" color="textSecondary">
-                      {searchTerm
-                        ? 'No students found matching your search'
-                        : 'No students found'}
-                    </Typography>
+              {displayedStudents.map((student) => (
+                <TableRow key={student.id}>
+                  <TableCell>
+                    {student.firstName} {student.lastName}
+                  </TableCell>
+                  <TableCell>{student.email}</TableCell>
+                  <TableCell>{student.dateOfBirth}</TableCell>
+                  <TableCell>{student.grade}</TableCell>
+                  <TableCell>{student.schoolName}</TableCell>
+                  <TableCell>{student.status}</TableCell>
+                  <TableCell>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleEdit(student)}
+                      color="primary"
+                    >
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleDelete(student.id)}
+                      color="error"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
-              ) : (
-                paginatedStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>{student.firstName}</TableCell>
-                    <TableCell>{student.lastName}</TableCell>
-                    <TableCell>{student.email}</TableCell>
-                    <TableCell>
-                      {student.schoolName}
-                    </TableCell>
-                    <TableCell>{student.grade}</TableCell>
-                    <TableCell>{student.status}</TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleEdit(student)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        color="error"
-                        onClick={() => handleDelete(student.id)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
         </TableContainer>
 
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
           <Pagination
-            count={Math.ceil(filteredStudents.length / rowsPerPage)}
+            count={totalPages}
             page={page}
-            onChange={(event, newPage) => setPage(newPage)}
+            onChange={handlePageChange}
             color="primary"
           />
         </Box>
       </Paper>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingStudent ? 'Edit Student' : 'Add New Student'}
-        </DialogTitle>
-        <form onSubmit={handleSubmit}>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="First Name"
-              fullWidth
-              required
-              value={formData.firstName}
-              onChange={(e) =>
-                setFormData({ ...formData, firstName: e.target.value })
-              }
-            />
-            <TextField
-              margin="dense"
-              label="Last Name"
-              fullWidth
-              required
-              value={formData.lastName}
-              onChange={(e) =>
-                setFormData({ ...formData, lastName: e.target.value })
-              }
-            />
-            <TextField
-              margin="dense"
-              label="Email"
-              type="email"
-              fullWidth
-              required
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-            />
-            <TextField
-              margin="dense"
-              label="Date of Birth"
-              type="date"
-              fullWidth
-              required
-              InputLabelProps={{ shrink: true }}
-              value={formData.dateOfBirth}
-              onChange={(e) =>
-                setFormData({ ...formData, dateOfBirth: e.target.value })
-              }
-            />
-            <FormControl fullWidth margin="dense">
-              <InputLabel>Gender</InputLabel>
-              <Select
-                value={formData.gender}
-                label="Gender"
-                onChange={(e) =>
-                  setFormData({ ...formData, gender: e.target.value })
-                }
-                required
-              >
-                <MenuItem value="male">Male</MenuItem>
-                <MenuItem value="female">Female</MenuItem>
-                <MenuItem value="other">Other</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="dense">
-              <InputLabel>School</InputLabel>
-              <Select
-                value={formData.schoolId || ''}
-                label="School"
-                onChange={(e) =>
-                  setFormData({ ...formData, schoolId: e.target.value })
-                }
-                required
-              >
-                {schools.map((school) => (
-                  <MenuItem key={school.id} value={school.id}>
-                    {school.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              margin="dense"
-              label="Grade"
-              fullWidth
-              required
-              value={formData.grade}
-              onChange={(e) =>
-                setFormData({ ...formData, grade: e.target.value })
-              }
-            />
-            <FormControl fullWidth margin="dense">
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={formData.status}
-                label="Status"
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    status: e.target.value as 'active' | 'inactive',
-                  })
-                }
-                required
-              >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
-              </Select>
-            </FormControl>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleClose}>Cancel</Button>
-            <Button type="submit" variant="contained" color="primary">
-              {editingStudent ? 'Update' : 'Add'}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
+      <StudentForm
+        open={open}
+        handleClose={handleClose}
+        handleSave={handleSave}
+        editingStudent={editingStudent}
+        schools={schools}
+      />
 
       <Snackbar
-        open={alertOpen}
+        open={snackbar.open}
         autoHideDuration={6000}
-        onClose={() => setAlertOpen(false)}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
         <Alert
-          onClose={() => setAlertOpen(false)}
-          severity={alertSeverity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
           sx={{ width: '100%' }}
         >
-          {alertMessage}
+          {snackbar.message}
         </Alert>
       </Snackbar>
     </Container>
