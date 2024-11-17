@@ -13,49 +13,105 @@ export interface RegisterData extends LoginData {
   role: string;
 }
 
+export interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  token: string;
+}
+
+interface AuthResponseData {
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+  };
+  token: string;
+}
+
 export interface AuthResponse {
   status: string;
-  data: {
-    user: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-      role: string;
-    };
-    token: string;
-  };
+  data: AuthResponseData;
 }
 
 class AuthService {
-  async login(data: LoginData): Promise<AuthResponse> {
-    const response = await axios.post(API_URL + 'login', data);
-    if (response.data.data.token) {
-      localStorage.setItem('user', JSON.stringify(response.data.data));
+  async login(data: LoginData): Promise<User> {
+    try {
+      const response = await axios.post<AuthResponse>(API_URL + 'login', data);
+      if (response.data?.data?.user && response.data.data.token) {
+        const userData: User = {
+          ...response.data.data.user,
+          token: response.data.data.token
+        };
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+      throw new Error('Invalid response data');
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw error;
     }
-    return response.data;
   }
 
-  async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await axios.post(API_URL + 'register', data);
-    if (response.data.data.token) {
-      localStorage.setItem('user', JSON.stringify(response.data.data));
+  async register(data: RegisterData): Promise<User> {
+    try {
+      const response = await axios.post<AuthResponse>(API_URL + 'register', data);
+      if (response.data?.data?.user && response.data.data.token) {
+        const userData: User = {
+          ...response.data.data.user,
+          token: response.data.data.token
+        };
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+      throw new Error('Invalid response data');
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        throw new Error(error.response.data.message);
+      }
+      throw error;
     }
-    return response.data;
   }
 
   logout(): void {
     localStorage.removeItem('user');
   }
 
-  getCurrentUser(): any {
+  getCurrentUser(): User | null {
     const userStr = localStorage.getItem('user');
     if (userStr) {
-      const userData = JSON.parse(userStr);
-      console.log('Current User Data:', userData);
-      return userData;
+      try {
+        const userData = JSON.parse(userStr);
+        if (this.isValidUser(userData)) {
+          return userData;
+        }
+        this.logout();
+        return null;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        this.logout();
+        return null;
+      }
     }
     return null;
+  }
+
+  private isValidUser(user: any): user is User {
+    return (
+      user &&
+      typeof user.id === 'string' &&
+      typeof user.firstName === 'string' &&
+      typeof user.lastName === 'string' &&
+      typeof user.email === 'string' &&
+      typeof user.role === 'string' &&
+      typeof user.token === 'string'
+    );
   }
 }
 

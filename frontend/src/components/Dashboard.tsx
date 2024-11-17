@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AuthService from '../services/auth.service';
+import AuthService, { User } from '../services/auth.service';
 import {
   AppBar,
   Box,
@@ -8,7 +8,7 @@ import {
   Drawer,
   IconButton,
   List,
-  ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Toolbar,
@@ -26,28 +26,30 @@ import {
   Assignment as AssignmentIcon,
   ExitToApp as LogoutIcon,
   Dashboard as DashboardIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
+
+interface MenuItem {
+  text: string;
+  icon: JSX.Element;
+  path: string;
+}
 
 const drawerWidth = 240;
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const user = AuthService.getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const userData = AuthService.getCurrentUser();
-    console.log('User Data:', userData);
-    if (!userData || !userData.user) {
+    const user = AuthService.getCurrentUser();
+    if (!user) {
       navigate('/login');
       return;
     }
+    setCurrentUser(user);
   }, [navigate]);
-
-  if (!user || !user.user) {
-    navigate('/login');
-    return null;
-  }
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -58,77 +60,81 @@ const Dashboard: React.FC = () => {
     navigate('/login');
   };
 
-  const getMenuItems = () => {
-    const menuItems = [
-      { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+  const formatRole = (role: string | undefined): string => {
+    if (!role) return 'User';
+    return role.replace(/_/g, ' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase());
+  };
+
+  const getMenuItems = (): MenuItem[] => {
+    const items: MenuItem[] = [
+      {
+        text: 'Dashboard',
+        icon: <DashboardIcon />,
+        path: '/dashboard',
+      },
     ];
 
-    switch (user.user.role) {
-      case 'super_admin':
-        menuItems.push(
-          { text: 'Schools', icon: <SchoolIcon />, path: '/schools' },
-          { text: 'Users', icon: <PersonIcon />, path: '/users' }
-        );
-        break;
-      case 'school_admin':
-        menuItems.push(
-          { text: 'Teachers', icon: <PersonIcon />, path: '/teachers' },
-          { text: 'Students', icon: <PersonIcon />, path: '/students' },
-          { text: 'Health Staff', icon: <HealthIcon />, path: '/health-staff' }
-        );
-        break;
-      case 'teacher':
-        menuItems.push(
-          { text: 'Students', icon: <PersonIcon />, path: '/students' },
-          { text: 'Assignments', icon: <AssignmentIcon />, path: '/assignments' }
-        );
-        break;
-      case 'health_staff':
-        menuItems.push(
-          { text: 'Health Records', icon: <HealthIcon />, path: '/health-records' },
-          { text: 'Students', icon: <PersonIcon />, path: '/students' }
-        );
-        break;
-      case 'student':
-        menuItems.push(
-          { text: 'Assignments', icon: <AssignmentIcon />, path: '/assignments' },
-          { text: 'Health Records', icon: <HealthIcon />, path: '/my-health-records' }
-        );
-        break;
-      case 'parent':
-        menuItems.push(
-          { text: 'Children', icon: <PersonIcon />, path: '/children' },
-          { text: 'Health Records', icon: <HealthIcon />, path: '/children-health-records' }
-        );
-        break;
+    if (currentUser?.role === 'super_admin') {
+      items.push({
+        text: 'Schools',
+        icon: <SchoolIcon />,
+        path: '/schools',
+      });
     }
-    console.log('Menu Items:', menuItems);
-    return menuItems;
+
+    if (currentUser?.role === 'school_admin' || currentUser?.role === 'super_admin') {
+      items.push(
+        {
+          text: 'Teachers',
+          icon: <PersonIcon />,
+          path: '/teachers',
+        },
+        {
+          text: 'Health Staff',
+          icon: <HealthIcon />,
+          path: '/health-staff',
+        }
+      );
+    }
+
+    if (currentUser?.role === 'teacher') {
+      items.push({
+        text: 'Assignments',
+        icon: <AssignmentIcon />,
+        path: '/assignments',
+      });
+    }
+
+    return items;
   };
 
   const drawer = (
     <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          School Management
-        </Typography>
-      </Toolbar>
+      <Toolbar />
       <List>
         {getMenuItems().map((item) => (
-          <ListItem key={item.text} onClick={() => navigate(item.path)} component="button">
+          <ListItemButton
+            key={item.text}
+            onClick={() => navigate(item.path)}
+            selected={window.location.pathname === item.path}
+          >
             <ListItemIcon>{item.icon}</ListItemIcon>
             <ListItemText primary={item.text} />
-          </ListItem>
+          </ListItemButton>
         ))}
-        <ListItem onClick={handleLogout} component="button">
+        <ListItemButton onClick={handleLogout}>
           <ListItemIcon>
             <LogoutIcon />
           </ListItemIcon>
           <ListItemText primary="Logout" />
-        </ListItem>
+        </ListItemButton>
       </List>
     </div>
   );
+
+  if (!currentUser) {
+    return null;
+  }
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -150,14 +156,31 @@ const Dashboard: React.FC = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            Welcome, {user.user.firstName} {user.user.lastName}
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+            {currentUser.role === 'super_admin' && window.location.pathname === '/schools'
+              ? 'Schools Management'
+              : 'Dashboard'}
           </Typography>
+          {currentUser.role === 'super_admin' && window.location.pathname === '/schools' && (
+            <Button
+              color="inherit"
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/schools/add')}
+            >
+              Add School
+            </Button>
+          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+            <Typography variant="body2">
+              {currentUser ? formatRole(currentUser.role) : 'User'}
+            </Typography>
+          </Box>
         </Toolbar>
       </AppBar>
       <Box
         component="nav"
         sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        aria-label="mailbox folders"
       >
         <Drawer
           variant="temporary"
@@ -204,38 +227,21 @@ const Dashboard: React.FC = () => {
             <Grid item xs={12}>
               <Paper
                 sx={{
-                  p: 2,
+                  p: 4,
                   display: 'flex',
                   flexDirection: 'column',
-                  height: 240,
+                  minHeight: 240,
                 }}
               >
                 <Typography variant="h4" gutterBottom>
-                  {user.user.role === 'super_admin'
-                    ? 'System Overview'
-                    : user.user.role === 'school_admin'
-                    ? 'School Overview'
-                    : user.user.role === 'teacher'
-                    ? 'Class Overview'
-                    : user.user.role === 'health_staff'
-                    ? 'Health Records Overview'
-                    : user.user.role === 'student'
-                    ? 'Student Dashboard'
-                    : 'Parent Dashboard'}
+                  Welcome, {currentUser.firstName}!
+                </Typography>
+                <Typography variant="body1" gutterBottom>
+                  Role: {formatRole(currentUser.role)}
                 </Typography>
                 <Typography variant="body1" paragraph>
-                  Welcome to your dashboard. Use the menu on the left to navigate through
-                  different sections based on your role.
+                  This is your dashboard. You can access all your permitted functions from the menu on the left.
                 </Typography>
-                <Box sx={{ mt: 2 }}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => navigate(getMenuItems()[1]?.path || '/dashboard')}
-                  >
-                    View {getMenuItems()[1]?.text || 'Dashboard'}
-                  </Button>
-                </Box>
               </Paper>
             </Grid>
           </Grid>
