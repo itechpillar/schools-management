@@ -1,5 +1,6 @@
 import AppDataSource from '../config/database';
-import { User, UserRole } from '../models/User';
+import { User, UserRole } from '../entities/User';
+import * as bcrypt from 'bcrypt';
 
 const seedUsers = async () => {
   try {
@@ -13,11 +14,14 @@ const seedUsers = async () => {
 
     if (!existingSuperAdmin) {
       console.log('Creating super admin user...');
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash('1superadmin', salt);
+
       const superAdmin = new User();
       superAdmin.firstName = 'Super';
       superAdmin.lastName = 'Admin';
-      superAdmin.email = 'admin@school.com';
-      superAdmin.password = 'admin123';
+      superAdmin.email = 'superadmin@gmail.com';
+      superAdmin.password = hashedPassword;
       superAdmin.role = UserRole.SUPER_ADMIN;
       await userRepository.save(superAdmin);
       console.log('Super admin created successfully');
@@ -50,8 +54,11 @@ const seedUsers = async () => {
 
       if (!existingUser) {
         console.log(`Creating ${testUser.role} user...`);
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(testUser.password, salt);
+
         const user = new User();
-        Object.assign(user, testUser);
+        Object.assign(user, { ...testUser, password: hashedPassword });
         await userRepository.save(user);
         console.log(`${testUser.role} user created successfully`);
       } else {

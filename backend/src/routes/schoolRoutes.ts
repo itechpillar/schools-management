@@ -7,7 +7,7 @@ import {
   deleteSchool,
 } from '../controllers/schoolController';
 import { auth } from '../middleware/auth';
-import { UserRole } from '../models/User';
+import { UserRole } from '../entities/User';
 
 const router = express.Router();
 

@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { User, UserRole } from '../models/User';
+import { User, UserRole } from '../entities/User';
 import { AppError } from '../utils/appError';
 import AppDataSource from '../config/database';
+import * as bcrypt from 'bcrypt';
 
 export class AuthController {
   static async register(
@@ -31,12 +32,16 @@ export class AuthController {
         return next(new AppError(400, 'Email already registered'));
       }
 
+      // Hash password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
       // Create new user
       const user = new User();
       user.firstName = firstName;
       user.lastName = lastName;
       user.email = email;
-      user.password = password;
+      user.password = hashedPassword;
       user.role = role;
 
       console.log('Saving user:', { ...user, password: '[REDACTED]' });
@@ -94,15 +99,20 @@ export class AuthController {
       }
 
       // Check password
+      //let t = await bcrypt.hash(password, 10);
       console.log('Checking password for user:', email);
-      const isPasswordValid = await user.comparePassword(password);
+      console.log('Stored hashed password:', user.password);
+      console.log(`Attempting to compare with provided password ${password}`);
+      console.log(`Provided password: ${password}`);
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      console.log('Password comparison result:', isPasswordValid);
+
       if (!isPasswordValid) {
         console.log('Invalid password for user:', email);
         return next(new AppError(401, 'Invalid email or password'));
       }
 
-      console.log('Password valid, generating token for user:', email);
-      // Generate JWT token
+      // Generate token
       const token = jwt.sign(
         { id: user.id, role: user.role },
         process.env.JWT_SECRET || 'your-secret-key',
@@ -111,7 +121,6 @@ export class AuthController {
         }
       );
 
-      console.log('Login successful for user:', email);
       res.status(200).json({
         status: 'success',
         data: {
