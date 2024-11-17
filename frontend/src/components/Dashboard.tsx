@@ -37,12 +37,20 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import AuthService, { User } from '../services/auth.service';
+import axios from 'axios';
 
 interface MenuItem {
   text: string;
   icon: JSX.Element;
   path: string;
   roles: string[];
+}
+
+interface DashboardStats {
+  totalSchools: number;
+  totalTeachers: number;
+  totalStudents: number;
+  activeClasses: number;
 }
 
 const drawerWidth = 240;
@@ -127,9 +135,15 @@ const QuickStatsCard = styled(Paper)(({ theme }) => ({
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [open, setOpen] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalSchools: 0,
+    totalTeachers: 0,
+    totalStudents: 0,
+    activeClasses: 0
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const user = AuthService.getCurrentUser();
@@ -138,10 +152,31 @@ const Dashboard: React.FC = () => {
       return;
     }
     setCurrentUser(user);
+    fetchDashboardStats(user);
   }, [navigate]);
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
+  const fetchDashboardStats = async (user: User) => {
+    try {
+      setLoading(true);
+      // Fetch schools count
+      const schoolsResponse = await axios.get('http://localhost:3001/api/schools', {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      
+      // Update stats with actual schools count
+      setStats(prevStats => ({
+        ...prevStats,
+        totalSchools: schoolsResponse.data.data.length || 0,
+        // For now, keeping other stats static until we implement their respective endpoints
+        totalTeachers: 120,
+        totalStudents: 1250,
+        activeClasses: 45
+      }));
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDrawerOpen = () => {
@@ -157,13 +192,7 @@ const Dashboard: React.FC = () => {
     navigate('/login');
   };
 
-  const formatRole = (role: string | undefined): string => {
-    if (!role) return 'User';
-    return role.replace(/_/g, ' ').replace(/\b\w/g, (letter: string) => letter.toUpperCase());
-  };
-
-  const menuItems: MenuItem[] = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', roles: ['super_admin', 'school_admin', 'teacher'] },
+  const menuItems = [
     { text: 'Schools', icon: <SchoolIcon />, path: '/schools', roles: ['super_admin'] },
     { text: 'Teachers', icon: <PersonIcon />, path: '/teachers', roles: ['super_admin', 'school_admin'] },
     { text: 'Students', icon: <PersonIcon />, path: '/students', roles: ['super_admin', 'school_admin', 'teacher'] },
@@ -173,10 +202,10 @@ const Dashboard: React.FC = () => {
   ];
 
   const quickStats = [
-    { title: 'Total Schools', value: '15', icon: <SchoolIcon sx={{ fontSize: 40 }} />, color: '#1976d2' },
-    { title: 'Active Teachers', value: '120', icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#2e7d32' },
-    { title: 'Total Students', value: '1,250', icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#ed6c02' },
-    { title: 'Ongoing Classes', value: '45', icon: <ClassIcon sx={{ fontSize: 40 }} />, color: '#9c27b0' },
+    { title: 'Total Schools', value: loading ? '...' : stats.totalSchools.toString(), icon: <SchoolIcon sx={{ fontSize: 40 }} />, color: '#1976d2' },
+    { title: 'Active Teachers', value: loading ? '...' : stats.totalTeachers.toString(), icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#2e7d32' },
+    { title: 'Total Students', value: loading ? '...' : stats.totalStudents.toString(), icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#ed6c02' },
+    { title: 'Ongoing Classes', value: loading ? '...' : stats.activeClasses.toString(), icon: <ClassIcon sx={{ fontSize: 40 }} />, color: '#9c27b0' },
   ];
 
   const recentActivities = [
