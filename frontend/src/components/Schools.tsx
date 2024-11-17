@@ -22,8 +22,19 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
+  Breadcrumbs,
+  Link,
+  TablePagination,
+  TableSortLabel,
+  InputAdornment,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  ArrowBack as ArrowBackIcon,
+  Search as SearchIcon,
+} from '@mui/icons-material';
 import axios from 'axios';
 
 interface School {
@@ -46,6 +57,9 @@ interface ApiResponse<T> {
   data: T;
 }
 
+type Order = 'asc' | 'desc';
+type OrderBy = keyof Omit<School, 'id'>;
+
 const Schools: React.FC = () => {
   const navigate = useNavigate();
   const [schools, setSchools] = useState<School[]>([]);
@@ -63,6 +77,17 @@ const Schools: React.FC = () => {
     message: '',
     severity: 'success' as 'success' | 'error',
   });
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Sorting state
+  const [order, setOrder] = useState<Order>('asc');
+  const [orderBy, setOrderBy] = useState<OrderBy>('name');
+  
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
 
   const user = AuthService.getCurrentUser();
 
@@ -92,6 +117,46 @@ const Schools: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Sorting function
+  const handleRequestSort = (property: OrderBy) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
+
+  // Sorting logic
+  const sortedSchools = [...schools].sort((a, b) => {
+    if (order === 'asc') {
+      return a[orderBy] > b[orderBy] ? 1 : -1;
+    } else {
+      return b[orderBy] > a[orderBy] ? 1 : -1;
+    }
+  });
+
+  // Search logic
+  const filteredSchools = sortedSchools.filter((school) => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      school.name.toLowerCase().includes(searchLower) ||
+      school.address.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Pagination logic
+  const paginatedSchools = filteredSchools.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,50 +245,183 @@ const Schools: React.FC = () => {
     }
   };
 
+  const SortableTableCell: React.FC<{
+    property: OrderBy;
+    label: string;
+    sx?: React.CSSProperties | any;
+  }> = ({ property, label, sx }) => (
+    <TableCell sx={sx}>
+      <TableSortLabel
+        active={orderBy === property}
+        direction={orderBy === property ? order : 'asc'}
+        onClick={() => handleRequestSort(property)}
+      >
+        {label}
+      </TableSortLabel>
+    </TableCell>
+  );
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1">
-          Schools Management
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => setOpen(true)}
-        >
-          Add School
-        </Button>
+      <Box sx={{ mb: 4 }}>
+        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+          <Link
+            component="button"
+            variant="body1"
+            onClick={() => navigate('/dashboard')}
+            sx={{ display: 'flex', alignItems: 'center' }}
+          >
+            <ArrowBackIcon sx={{ mr: 0.5 }} fontSize="small" />
+            Dashboard
+          </Link>
+          <Typography color="text.primary">Schools Management</Typography>
+        </Breadcrumbs>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h4" component="h1">
+            Schools Management
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => setOpen(true)}
+          >
+            Add School
+          </Button>
+        </Box>
+
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Search by school name or address..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ mb: 2 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
       </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
+      <TableContainer 
+        component={Paper} 
+        sx={{
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          borderRadius: '10px',
+          overflow: 'hidden',
+        }}
+      >
+        <Table sx={{ minWidth: 650 }}>
           <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Address</TableCell>
-              <TableCell>Contact</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell align="right">Actions</TableCell>
+            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+              <SortableTableCell 
+                property="name" 
+                label="Name" 
+                sx={{
+                  fontWeight: 'bold',
+                  color: '#1976d2',
+                  fontSize: '0.95rem',
+                }}
+              />
+              <SortableTableCell 
+                property="address" 
+                label="Address"
+                sx={{
+                  fontWeight: 'bold',
+                  color: '#1976d2',
+                  fontSize: '0.95rem',
+                }}
+              />
+              <SortableTableCell 
+                property="contactNumber" 
+                label="Contact"
+                sx={{
+                  fontWeight: 'bold',
+                  color: '#1976d2',
+                  fontSize: '0.95rem',
+                }}
+              />
+              <SortableTableCell 
+                property="email" 
+                label="Email"
+                sx={{
+                  fontWeight: 'bold',
+                  color: '#1976d2',
+                  fontSize: '0.95rem',
+                }}
+              />
+              <TableCell 
+                align="right"
+                sx={{
+                  fontWeight: 'bold',
+                  color: '#1976d2',
+                  fontSize: '0.95rem',
+                }}
+              >
+                Actions
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                  <CircularProgress />
+                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                  <CircularProgress size={40} thickness={4} />
                 </TableCell>
               </TableRow>
-            ) : schools.length === 0 ? (
+            ) : paginatedSchools.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                  No schools found
+                <TableCell 
+                  colSpan={5} 
+                  align="center" 
+                  sx={{ 
+                    py: 4,
+                    color: 'text.secondary',
+                    fontSize: '1rem',
+                  }}
+                >
+                  {searchQuery ? (
+                    <>
+                      <Box sx={{ mb: 2 }}>
+                        <SearchIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
+                      </Box>
+                      No schools found matching your search
+                    </>
+                  ) : (
+                    'No schools found'
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
-              schools.map((school) => (
-                <TableRow key={school.id}>
-                  <TableCell>{school.name}</TableCell>
+              paginatedSchools.map((school, index) => (
+                <TableRow 
+                  key={school.id}
+                  sx={{
+                    '&:nth-of-type(odd)': { backgroundColor: 'rgba(0, 0, 0, 0.02)' },
+                    '&:hover': { 
+                      backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                      transition: 'background-color 0.2s ease',
+                    },
+                    transition: 'background-color 0.2s ease',
+                  }}
+                >
+                  <TableCell 
+                    sx={{ 
+                      fontWeight: 500,
+                      borderLeft: '4px solid transparent',
+                      '&:hover': {
+                        borderLeft: '4px solid #1976d2',
+                      },
+                      transition: 'border-left 0.2s ease',
+                    }}
+                  >
+                    {school.name}
+                  </TableCell>
                   <TableCell>{school.address}</TableCell>
                   <TableCell>{school.contactNumber}</TableCell>
                   <TableCell>{school.email}</TableCell>
@@ -232,6 +430,12 @@ const Schools: React.FC = () => {
                       color="primary"
                       onClick={() => handleEdit(school)}
                       size="small"
+                      sx={{ 
+                        mr: 1,
+                        '&:hover': { 
+                          backgroundColor: 'rgba(25, 118, 210, 0.12)',
+                        },
+                      }}
                     >
                       <EditIcon />
                     </IconButton>
@@ -239,6 +443,11 @@ const Schools: React.FC = () => {
                       color="error"
                       onClick={() => handleDelete(school.id)}
                       size="small"
+                      sx={{ 
+                        '&:hover': { 
+                          backgroundColor: 'rgba(211, 47, 47, 0.12)',
+                        },
+                      }}
                     >
                       <DeleteIcon />
                     </IconButton>
@@ -248,6 +457,19 @@ const Schools: React.FC = () => {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={filteredSchools.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          sx={{
+            borderTop: '1px solid rgba(224, 224, 224, 1)',
+            backgroundColor: '#f5f5f5',
+          }}
+        />
       </TableContainer>
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>

@@ -14,9 +14,9 @@ export interface RegisterData extends LoginData {
 }
 
 export interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
+  userId: string;
+  first_name: string;
+  last_name: string;
   email: string;
   role: string;
   token: string;
@@ -44,7 +44,11 @@ class AuthService {
       const response = await axios.post<AuthResponse>(API_URL + 'login', data);
       if (response.data?.data?.user && response.data.data.token) {
         const userData: User = {
-          ...response.data.data.user,
+          userId: response.data.data.user.id,
+          first_name: response.data.data.user.firstName,
+          last_name: response.data.data.user.lastName,
+          email: response.data.data.user.email,
+          role: response.data.data.user.role,
           token: response.data.data.token
         };
         localStorage.setItem('user', JSON.stringify(userData));
@@ -64,7 +68,11 @@ class AuthService {
       const response = await axios.post<AuthResponse>(API_URL + 'register', data);
       if (response.data?.data?.user && response.data.data.token) {
         const userData: User = {
-          ...response.data.data.user,
+          userId: response.data.data.user.id,
+          first_name: response.data.data.user.firstName,
+          last_name: response.data.data.user.lastName,
+          email: response.data.data.user.email,
+          role: response.data.data.user.role,
           token: response.data.data.token
         };
         localStorage.setItem('user', JSON.stringify(userData));
@@ -105,9 +113,9 @@ class AuthService {
   private isValidUser(user: any): user is User {
     return (
       user &&
-      typeof user.id === 'string' &&
-      typeof user.firstName === 'string' &&
-      typeof user.lastName === 'string' &&
+      typeof user.userId === 'string' &&
+      typeof user.first_name === 'string' &&
+      typeof user.last_name === 'string' &&
       typeof user.email === 'string' &&
       typeof user.role === 'string' &&
       typeof user.token === 'string'
