@@ -1,11 +1,18 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class InitialSchema1700000000000 implements MigrationInterface {
-    name = 'InitialSchema1700000000000'
-
+export class CreateDatabase1700263000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
-        // Enable UUID extension
-        await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+        // Create enum type for user roles
+        await queryRunner.query(`
+            CREATE TYPE "user_role_enum" AS ENUM (
+                'super_admin',
+                'school_admin',
+                'teacher',
+                'student',
+                'parent',
+                'health_staff'
+            )
+        `);
 
         // Create schools table
         await queryRunner.query(`
@@ -20,6 +27,23 @@ export class InitialSchema1700000000000 implements MigrationInterface {
             )
         `);
 
+        // Create users table
+        await queryRunner.query(`
+            CREATE TABLE "users" (
+                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "firstName" varchar(100) NOT NULL,
+                "lastName" varchar(100) NOT NULL,
+                "email" varchar(100) NOT NULL UNIQUE,
+                "password" varchar(100) NOT NULL,
+                "role" user_role_enum NOT NULL DEFAULT 'student',
+                "schoolId" uuid,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "fk_user_school" FOREIGN KEY ("schoolId") 
+                    REFERENCES "schools"("id") ON DELETE SET NULL
+            )
+        `);
+
         // Create students table
         await queryRunner.query(`
             CREATE TABLE "students" (
@@ -27,16 +51,17 @@ export class InitialSchema1700000000000 implements MigrationInterface {
                 "first_name" varchar NOT NULL,
                 "middle_name" varchar,
                 "last_name" varchar NOT NULL,
-                "date_of_birth" TIMESTAMP NOT NULL,
+                "date_of_birth" date NOT NULL,
                 "gender" varchar NOT NULL,
-                "grade" varchar NOT NULL,
                 "status" varchar NOT NULL DEFAULT 'active',
                 "photo" bytea,
                 "photo_content_type" varchar,
                 "school_id" uuid NOT NULL,
+                "grade" varchar,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "fk_school" FOREIGN KEY ("school_id") REFERENCES "schools"("id") ON DELETE CASCADE
+                CONSTRAINT "fk_student_school" FOREIGN KEY ("school_id") 
+                    REFERENCES "schools"("id") ON DELETE CASCADE
             )
         `);
 
@@ -56,7 +81,8 @@ export class InitialSchema1700000000000 implements MigrationInterface {
                 "communication_preference" varchar,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "fk_student_emergency" FOREIGN KEY ("student_id") REFERENCES "students"("id") ON DELETE CASCADE
+                CONSTRAINT "fk_student_emergency" FOREIGN KEY ("student_id") 
+                    REFERENCES "students"("id") ON DELETE CASCADE
             )
         `);
 
@@ -77,7 +103,8 @@ export class InitialSchema1700000000000 implements MigrationInterface {
                 "status" varchar DEFAULT 'active',
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "fk_student_academic" FOREIGN KEY ("student_id") REFERENCES "students"("id") ON DELETE CASCADE
+                CONSTRAINT "fk_student_academic" FOREIGN KEY ("student_id") 
+                    REFERENCES "students"("id") ON DELETE CASCADE
             )
         `);
 
@@ -95,7 +122,8 @@ export class InitialSchema1700000000000 implements MigrationInterface {
                 "insurance_info" text,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "fk_student_medical" FOREIGN KEY ("student_id") REFERENCES "students"("id") ON DELETE CASCADE
+                CONSTRAINT "fk_student_medical" FOREIGN KEY ("student_id") 
+                    REFERENCES "students"("id") ON DELETE CASCADE
             )
         `);
 
@@ -106,22 +134,35 @@ export class InitialSchema1700000000000 implements MigrationInterface {
                 "student_id" uuid NOT NULL,
                 "fee_type" varchar NOT NULL,
                 "amount" decimal(10,2) NOT NULL,
-                "due_date" TIMESTAMP NOT NULL,
+                "due_date" date NOT NULL,
                 "payment_status" varchar NOT NULL DEFAULT 'pending',
                 "payment_method" varchar,
-                "payment_date" TIMESTAMP,
+                "payment_date" date,
                 "receipt_number" varchar,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "fk_student_fee" FOREIGN KEY ("student_id") REFERENCES "students"("id") ON DELETE CASCADE
+                CONSTRAINT "fk_student_fee" FOREIGN KEY ("student_id") 
+                    REFERENCES "students"("id") ON DELETE CASCADE
             )
         `);
 
-        // Create indexes for better query performance
+        // Create indexes
+        // Schools indexes
+        await queryRunner.query(`CREATE INDEX "idx_school_name" ON "schools"("name")`);
+
+        // Users indexes
+        await queryRunner.query(`CREATE INDEX "idx_user_email" ON "users"("email")`);
+        await queryRunner.query(`CREATE INDEX "idx_user_role" ON "users"("role")`);
+        await queryRunner.query(`CREATE INDEX "idx_user_school" ON "users"("schoolId")`);
+        await queryRunner.query(`CREATE INDEX "idx_user_name" ON "users"("firstName", "lastName")`);
+
+        // Students indexes
         await queryRunner.query(`CREATE INDEX "idx_student_school" ON "students"("school_id")`);
         await queryRunner.query(`CREATE INDEX "idx_student_name" ON "students"("first_name", "last_name")`);
         await queryRunner.query(`CREATE INDEX "idx_student_status" ON "students"("status")`);
-        await queryRunner.query(`CREATE INDEX "idx_school_name" ON "schools"("name")`);
+        await queryRunner.query(`CREATE INDEX "idx_student_grade" ON "students"("grade")`);
+
+        // Fees indexes
         await queryRunner.query(`CREATE INDEX "idx_student_fee_status" ON "student_fees"("payment_status")`);
         await queryRunner.query(`CREATE INDEX "idx_student_fee_type" ON "student_fees"("fee_type")`);
         await queryRunner.query(`CREATE INDEX "idx_student_fee_due_date" ON "student_fees"("due_date")`);
@@ -132,17 +173,26 @@ export class InitialSchema1700000000000 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_fee_due_date"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_fee_type"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_fee_status"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_school_name"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_grade"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_status"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_name"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_school"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_name"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_school"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_role"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_email"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_school_name"`);
 
-        // Drop tables
+        // Drop tables in reverse order
         await queryRunner.query(`DROP TABLE IF EXISTS "student_fees" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "student_medicals" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "student_academics" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "student_emergency_contacts" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "students" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "users" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "schools" CASCADE`);
+
+        // Drop enum type
+        await queryRunner.query(`DROP TYPE IF EXISTS "user_role_enum"`);
     }
 }
