@@ -96,7 +96,7 @@ const Students: React.FC = () => {
         id: student.id,
         firstName: student.firstName || student.first_name || '',
         lastName: student.lastName || student.last_name || '',
-        dateOfBirth: student.dateOfBirth || student.date_of_birth || '',
+        dateOfBirth: formatDate(student.dateOfBirth || student.date_of_birth),
         gender: student.gender || '',
         grade: student.grade || '',
         schoolId: student.school?.id?.toString() || student.schoolId || student.school_id || '',
@@ -111,6 +111,47 @@ const Students: React.FC = () => {
         severity: 'error',
       });
       setStudents([]);
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      // Parse the date string
+      const [year, month, day] = dateString.split(/[-\/]/);
+      // Create date in UTC to avoid timezone issues
+      const date = new Date(Date.UTC(
+        parseInt(year),
+        parseInt(month) - 1,  // Month is 0-based
+        parseInt(day),
+        12  // Set to noon UTC
+      ));
+      
+      if (isNaN(date.getTime())) return '';
+      
+      // Format as YYYY-MM-DD
+      const yyyy = date.getUTCFullYear();
+      const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(date.getUTCDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const formatDisplayDate = (dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const month = date.toLocaleString('default', { month: 'short' });
+      const year = date.getUTCFullYear();
+      
+      return `${day}-${month}-${year}`;
+    } catch {
+      return '';
     }
   };
 
@@ -135,22 +176,6 @@ const Students: React.FC = () => {
 
   const handleSave = async (formData: any) => {
     try {
-      if (editingStudent) {
-        await api.put(`/students/${editingStudent.id}`, formData);
-        setSnackbar({
-          open: true,
-          message: 'Student updated successfully',
-          severity: 'success',
-        });
-      } else {
-        await api.post('/students', formData);
-        setSnackbar({
-          open: true,
-          message: 'Student added successfully',
-          severity: 'success',
-        });
-      }
-      handleClose();
       fetchStudents();
     } catch (error) {
       console.error('Error saving student:', error);
@@ -162,8 +187,11 @@ const Students: React.FC = () => {
     }
   };
 
-  const handleEdit = (student: Student) => {
-    setEditingStudent(student);
+  const handleEditClick = (student: Student) => {
+    setEditingStudent({
+      ...student,
+      dateOfBirth: formatDate(student.dateOfBirth)
+    });
     setOpen(true);
   };
 
@@ -247,7 +275,8 @@ const Students: React.FC = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Name</TableCell>
+                <TableCell>First Name</TableCell>
+                <TableCell>Last Name</TableCell>
                 <TableCell>Date of Birth</TableCell>
                 <TableCell>Grade</TableCell>
                 <TableCell>School</TableCell>
@@ -258,17 +287,16 @@ const Students: React.FC = () => {
             <TableBody>
               {displayedStudents.map((student) => (
                 <TableRow key={student.id}>
-                  <TableCell>
-                    {student.firstName} {student.lastName}
-                  </TableCell>
-                  <TableCell>{student.dateOfBirth}</TableCell>
+                  <TableCell>{student.firstName}</TableCell>
+                  <TableCell>{student.lastName}</TableCell>
+                  <TableCell>{formatDisplayDate(student.dateOfBirth)}</TableCell>
                   <TableCell>{student.grade}</TableCell>
                   <TableCell>{student.schoolName}</TableCell>
                   <TableCell>{student.status}</TableCell>
                   <TableCell>
                     <IconButton
                       size="small"
-                      onClick={() => handleEdit(student)}
+                      onClick={() => handleEditClick(student)}
                       color="primary"
                     >
                       <EditIcon />
@@ -300,7 +328,7 @@ const Students: React.FC = () => {
       <StudentForm
         open={open}
         handleClose={handleClose}
-        handleSave={handleSave}
+        onComplete={handleSave}
         editingStudent={editingStudent}
         schools={schools}
       />

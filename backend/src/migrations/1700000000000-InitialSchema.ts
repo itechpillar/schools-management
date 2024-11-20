@@ -43,8 +43,8 @@ export class InitialSchema1700000000000 implements MigrationInterface {
         // Create student_emergency_contacts table
         await queryRunner.query(`
             CREATE TABLE "student_emergency_contacts" (
-                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "student_id" uuid NOT NULL UNIQUE,
+                "contact_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "student_id" uuid NOT NULL,
                 "contact_name" varchar NOT NULL,
                 "relationship" varchar NOT NULL,
                 "phone_number" varchar NOT NULL,
@@ -65,12 +65,16 @@ export class InitialSchema1700000000000 implements MigrationInterface {
             CREATE TABLE "student_academics" (
                 "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
                 "student_id" uuid NOT NULL UNIQUE,
-                "previous_school" varchar,
                 "academic_year" varchar NOT NULL,
-                "current_grade" varchar NOT NULL,
-                "class_section" varchar,
-                "achievements" text,
-                "extra_curricular" text,
+                "grade" varchar NOT NULL,
+                "section" varchar,
+                "roll_number" varchar,
+                "subjects" json,
+                "attendance_percentage" decimal(5,2),
+                "exam_scores" json,
+                "extracurricular_activities" json,
+                "class_teacher_remarks" varchar,
+                "status" varchar DEFAULT 'active',
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
                 CONSTRAINT "fk_student_academic" FOREIGN KEY ("student_id") REFERENCES "students"("id") ON DELETE CASCADE

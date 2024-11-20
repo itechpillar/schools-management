@@ -1,12 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Student } from './Student';
 
 @Entity('student_emergency_contacts')
 export class StudentEmergencyContact {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn('uuid', { name: 'contact_id' })
+  contact_id: string;
 
-  @OneToOne(() => Student)
+  @ManyToOne(() => Student, student => student.emergency_contacts)
   @JoinColumn({ name: 'student_id' })
   student: Student;
 

@@ -1,5 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToOne, OneToMany, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
-import { School } from '../entities/School';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
+import { School } from './School';
 import { StudentFee } from './StudentFee';
 import { StudentAcademic } from './StudentAcademic';
 import { StudentMedical } from './StudentMedical';
@@ -25,14 +25,11 @@ export class Student {
   @Column()
   gender: string;
 
-  @Column()
+  @Column({ nullable: false, default: '' })
+  grade: string;
+
+  @Column({ default: 'active' })
   status: string;
-
-  @Column({ type: 'bytea', nullable: true })
-  photo: Buffer | null;
-
-  @Column({ type: 'varchar', nullable: true })
-  photo_content_type: string | null;
 
   @ManyToOne(() => School, school => school.students, { nullable: false })
   @JoinColumn({ name: 'school_id' })
@@ -41,17 +38,14 @@ export class Student {
   @OneToMany(() => StudentFee, fee => fee.student)
   fees: StudentFee[];
 
-  @OneToOne(() => StudentAcademic, academic => academic.student)
-  academic: StudentAcademic;
+  @OneToMany(() => StudentAcademic, academic => academic.student)
+  academics: StudentAcademic[];
 
-  @OneToOne(() => StudentMedical, medical => medical.student)
-  medical: StudentMedical;
+  @OneToMany(() => StudentMedical, medical => medical.student)
+  medicals: StudentMedical[];
 
-  @OneToOne(() => StudentEmergencyContact, contact => contact.student)
-  emergency_contact: StudentEmergencyContact;
-
-  @Column({ nullable: true })
-  grade: string;
+  @OneToMany(() => StudentEmergencyContact, emergencyContact => emergencyContact.student)
+  emergency_contacts: StudentEmergencyContact[];
 
   @CreateDateColumn()
   created_at: Date;
