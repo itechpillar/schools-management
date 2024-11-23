@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Student } from './Student';
 
 @Entity('student_medical')
@@ -6,7 +6,7 @@ export class StudentMedical {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @OneToOne(() => Student)
+  @ManyToOne(() => Student, student => student.medicals)
   @JoinColumn({ name: 'student_id' })
   student: Student;
 
@@ -16,29 +16,53 @@ export class StudentMedical {
   @Column({ nullable: true })
   blood_group: string;
 
-  @Column('text', { nullable: true })
+  @Column({ type: 'text', nullable: true })
   medical_conditions: string;
 
-  @Column('text', { nullable: true })
+  @Column({ type: 'text', nullable: true })
+  allergies: string;
+
+  @Column({ type: 'text', nullable: true })
   medications: string;
 
-  @Column('text', { nullable: true })
+  @Column({ type: 'text', nullable: true })
+  immunizations: string;
+
+  @Column({ nullable: true })
+  emergency_contact_name: string;
+
+  @Column({ nullable: true })
+  emergency_contact_number: string;
+
+  @Column({ nullable: true })
+  family_doctor_name: string;
+
+  @Column({ nullable: true })
+  family_doctor_number: string;
+
+  @Column({ nullable: true })
+  preferred_hospital: string;
+
+  @Column({ type: 'text', nullable: true })
+  medical_insurance: string;
+
+  @Column({ type: 'text', nullable: true })
+  special_needs: string;
+
+  @Column({ type: 'text', nullable: true })
+  dietary_restrictions: string;
+
+  @Column({ type: 'text', nullable: true })
   physical_disabilities: string;
 
-  @Column('json', { nullable: true })
-  immunization_records: any;
+  @Column({ type: 'date', nullable: true })
+  last_physical_exam: Date | null;
 
-  @Column({ nullable: true })
-  doctor_name: string;
+  @Column({ type: 'text', nullable: true })
+  additional_notes: string;
 
-  @Column({ nullable: true })
-  doctor_contact: string;
-
-  @Column({ nullable: true })
-  hospital_preference: string;
-
-  @Column('text', { nullable: true })
-  allergies: string;
+  @Column({ default: 'active' })
+  status: string;
 
   @CreateDateColumn()
   created_at: Date;
