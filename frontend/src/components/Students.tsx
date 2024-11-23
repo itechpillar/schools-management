@@ -146,8 +146,9 @@ const Students: React.FC = () => {
       if (isNaN(date.getTime())) return '';
       
       const day = String(date.getUTCDate()).padStart(2, '0');
-      const month = date.toLocaleString('default', { month: 'short' });
+      const month = date.toLocaleString('en-US', { month: 'short' });
       const year = date.getUTCFullYear();
+      console.log(date,day, month, year);
       
       return `${day}-${month}-${year}`;
     } catch {
