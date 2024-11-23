@@ -24,7 +24,7 @@ export class StudentFee {
   @Column()
   academic_year: string;
 
-  @Column()
+  @Column({ nullable: true })
   term: string;
 
   @Column('decimal', { precision: 10, scale: 2 })

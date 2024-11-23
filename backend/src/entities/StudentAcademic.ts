@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Student } from './Student';
 
 @Entity('student_academics')
@@ -6,7 +6,7 @@ export class StudentAcademic {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @OneToOne(() => Student)
+  @ManyToOne(() => Student, student => student.academics)
   @JoinColumn({ name: 'student_id' })
   student: Student;
 
@@ -14,37 +14,53 @@ export class StudentAcademic {
   student_id: string;
 
   @Column()
+  academic_year: string;
+
+  @Column()
   grade: string;
 
   @Column()
   section: string;
 
-  @Column()
+  @Column({ nullable: true })
   roll_number: string;
 
-  @Column('simple-array', { nullable: true })
-  subjects_enrolled: string[];
+  @Column({ type: 'json', nullable: true })
+  subjects: string[];
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  attendance_percentage: number;
+
+  @Column({ type: 'json', nullable: true })
+  exam_scores: {
+    exam_name: string;
+    subject: string;
+    marks_obtained: number;
+    total_marks: number;
+    grade: string;
+  }[];
+
+  @Column({ type: 'json', nullable: true })
+  extracurricular_activities: {
+    activity_name: string;
+    position: string;
+    achievement: string;
+  }[];
+
+  @Column({ nullable: true })
+  class_teacher_remarks: string;
 
   @Column({ nullable: true })
   previous_school: string;
 
   @Column({ type: 'date', nullable: true })
-  admission_date: Date;
-
-  @Column({ nullable: true })
-  slc_number: string;
+  admission_date: Date | null;
 
   @Column({ nullable: true })
   board: string;
 
-  @Column('decimal', { precision: 4, scale: 2, nullable: true })
-  gpa: number;
-
-  @Column('json', { nullable: true })
-  past_academic_performance: any;
-
-  @Column()
-  academic_year: string;
+  @Column({ default: 'active' })
+  status: string;
 
   @CreateDateColumn()
   created_at: Date;
