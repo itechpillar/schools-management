@@ -139,16 +139,16 @@ const Students: React.FC = () => {
     }
   };
 
-  const formatDisplayDate = (dateString?: string) => {
-    if (!dateString) return '';
+  const formatDisplayDate = (dateString: string) => {
     try {
-      const date = new Date(dateString);
+      // Add time to ensure consistent date handling
+      const date = new Date(dateString + 'T00:00:00Z');
       if (isNaN(date.getTime())) return '';
       
-      const day = String(date.getUTCDate()).padStart(2, '0');
+      // Use getDate() instead of getUTCDate() to get local date
+      const day = String(date.getDate()).padStart(2, '0');
       const month = date.toLocaleString('en-US', { month: 'short' });
-      const year = date.getUTCFullYear();
-      console.log(date,day, month, year);
+      const year = date.getFullYear();
       
       return `${day}-${month}-${year}`;
     } catch {
