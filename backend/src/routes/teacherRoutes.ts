@@ -260,7 +260,7 @@ router.post('/', checkRole([UserRole.SUPER_ADMIN]), async (req: Request<{}, {}, 
             relations: {
                 contact: true,
                 professional_details: true,
-                workHistory: true,
+                work_history: true,
                 qualifications: true,
                 financial: true
             }
@@ -306,7 +306,7 @@ router.get('/:id', checkRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserR
             relations: {
                 contact: true,
                 professional_details: true,
-                workHistory: true,
+                work_history: true,
                 qualifications: true,
                 financial: true
             }
@@ -403,7 +403,7 @@ router.put('/:id', checkRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), asy
             relations: {
                 contact: true,
                 professional_details: true,
-                workHistory: true,
+                work_history: true,
                 qualifications: true,
                 financial: true
             }
@@ -499,7 +499,7 @@ router.put('/:id', checkRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), asy
             relations: {
                 contact: true,
                 professional_details: true,
-                workHistory: true,
+                work_history: true,
                 qualifications: true,
                 financial: true
             }

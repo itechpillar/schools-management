@@ -30,8 +30,11 @@ export class Teacher {
     @Column({ name: 'pan_number', length: 10, unique: true, nullable: true })
     pan_number: string;
 
-    @Column({ type: 'bytea', nullable: true })
-    photo: Buffer;
+    @Column({ name: 'photo_url', nullable: true })
+    photo_url: string;
+
+    @Column({ name: 'photo_public_id', nullable: true })
+    photo_public_id: string;
 
     @ManyToOne(() => School, school => school.teachers, { nullable: false })
     @JoinColumn({ name: 'school_id' })
@@ -49,11 +52,11 @@ export class Teacher {
     @OneToOne(() => TeacherFinancial, financial => financial.teacher)
     financial: TeacherFinancial;
 
-    @OneToOne(() => TeacherMedicals, medicals => medicals.teacher)
-    medicals: TeacherMedicals;
+    @OneToOne(() => TeacherMedicals, medical => medical.teacher)
+    medical: TeacherMedicals;
 
     @OneToMany(() => TeacherWorkHistory, workHistory => workHistory.teacher)
-    workHistory: TeacherWorkHistory[];
+    work_history: TeacherWorkHistory[];
 
     @CreateDateColumn({ name: 'created_at' })
     created_at: Date;

@@ -24,7 +24,7 @@ export class TeacherWorkHistory {
     @Column({ name: 'is_active', default: true })
     isActive: boolean;
 
-    @ManyToOne(() => Teacher, teacher => teacher.workHistory)
+    @ManyToOne(() => Teacher, teacher => teacher.work_history)
     @JoinColumn({ name: 'teacher_id' })
     teacher: Teacher;
 

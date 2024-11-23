@@ -31,6 +31,7 @@ const options: swaggerJsdoc.Options = {
     './src/routes/*.ts',
     './src/controllers/*.ts',
     './src/entities/*.ts',
+    './src/swagger/*.ts',
   ],
 };
 

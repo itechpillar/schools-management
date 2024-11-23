@@ -1,7 +1,24 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreateDatabase1700263000000 implements MigrationInterface {
+export class InitialMigration1732073665711 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
+        // Drop existing tables and types if they exist
+        await queryRunner.query(`DROP TYPE IF EXISTS "user_role_enum" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_work_history" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_medicals" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_financial" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_qualifications" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_professional" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_contact" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teachers" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "student_fees" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "student_emergency_contacts" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "student_medicals" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "student_academics" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "students" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "users" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "schools" CASCADE`);
+
         // Create enum type for user roles
         await queryRunner.query(`
             CREATE TYPE "user_role_enum" AS ENUM (
@@ -18,10 +35,10 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         await queryRunner.query(`
             CREATE TABLE "schools" (
                 "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "name" varchar NOT NULL,
-                "address" varchar NOT NULL,
-                "contact_number" varchar NOT NULL,
-                "email" varchar NOT NULL,
+                "name" varchar(255) NOT NULL,
+                "address" text NOT NULL,
+                "contact_number" varchar(50) NOT NULL,
+                "email" varchar(255) NOT NULL,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now()
             )
@@ -45,16 +62,14 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         await queryRunner.query(`
             CREATE TABLE "students" (
                 "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "first_name" varchar NOT NULL,
-                "middle_name" varchar,
-                "last_name" varchar NOT NULL,
+                "first_name" varchar(255) NOT NULL,
+                "middle_name" varchar(255),
+                "last_name" varchar(255) NOT NULL,
                 "date_of_birth" date NOT NULL,
-                "gender" varchar NOT NULL,
-                "status" varchar NOT NULL DEFAULT 'active',
-                "photo" bytea,
-                "photo_content_type" varchar,
+                "gender" varchar(50) NOT NULL,
+                "grade" varchar(50) NOT NULL DEFAULT '',
+                "status" varchar(50) DEFAULT 'active',
                 "school_id" uuid NOT NULL,
-                "grade" varchar,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
                 CONSTRAINT "fk_student_school" FOREIGN KEY ("school_id") 
@@ -65,17 +80,17 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         // Create student_emergency_contacts table
         await queryRunner.query(`
             CREATE TABLE "student_emergency_contacts" (
-                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "student_id" uuid NOT NULL UNIQUE,
-                "contact_name" varchar NOT NULL,
-                "relationship" varchar NOT NULL,
-                "phone_number" varchar NOT NULL,
-                "email" varchar,
-                "home_address" varchar NOT NULL,
-                "alternate_contact_name" varchar,
-                "alternate_contact_relationship" varchar,
-                "alternate_contact_number" varchar,
-                "communication_preference" varchar,
+                "contact_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "student_id" uuid NOT NULL,
+                "contact_name" varchar(255) NOT NULL,
+                "relationship" varchar(100) NOT NULL,
+                "phone_number" varchar(50) NOT NULL,
+                "email" varchar(255),
+                "home_address" text NOT NULL,
+                "alternate_contact_name" varchar(255),
+                "alternate_contact_relationship" varchar(100),
+                "alternate_contact_number" varchar(50),
+                "communication_preference" varchar(50),
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
                 CONSTRAINT "fk_student_emergency" FOREIGN KEY ("student_id") 
@@ -87,11 +102,11 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         await queryRunner.query(`
             CREATE TABLE "student_academics" (
                 "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "student_id" uuid NOT NULL UNIQUE,
-                "previous_school" varchar,
-                "academic_year" varchar NOT NULL,
-                "current_grade" varchar NOT NULL,
-                "class_section" varchar,
+                "student_id" uuid NOT NULL,
+                "previous_school" varchar(255),
+                "academic_year" varchar(50) NOT NULL,
+                "current_grade" varchar(50) NOT NULL,
+                "class_section" varchar(50),
                 "achievements" text,
                 "extra_curricular" text,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
@@ -105,13 +120,13 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         await queryRunner.query(`
             CREATE TABLE "student_medicals" (
                 "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "student_id" uuid NOT NULL UNIQUE,
-                "blood_group" varchar,
+                "student_id" uuid NOT NULL,
+                "blood_group" varchar(10),
                 "medical_conditions" text,
                 "allergies" text,
                 "medications" text,
-                "doctor_name" varchar,
-                "doctor_contact" varchar,
+                "doctor_name" varchar(255),
+                "doctor_contact" varchar(50),
                 "insurance_info" text,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
@@ -125,13 +140,13 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
             CREATE TABLE "student_fees" (
                 "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
                 "student_id" uuid NOT NULL,
-                "fee_type" varchar NOT NULL,
+                "fee_type" varchar(100) NOT NULL,
                 "amount" decimal(10,2) NOT NULL,
                 "due_date" date NOT NULL,
-                "payment_status" varchar NOT NULL DEFAULT 'pending',
-                "payment_method" varchar,
+                "payment_status" varchar(50) NOT NULL DEFAULT 'pending',
+                "payment_method" varchar(50),
                 "payment_date" date,
-                "receipt_number" varchar,
+                "receipt_number" varchar(100),
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
                 CONSTRAINT "fk_student_fee" FOREIGN KEY ("student_id") 
@@ -149,7 +164,8 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
                 "date_of_birth" date NOT NULL,
                 "aadhar_number" char(12) UNIQUE NOT NULL,
                 "pan_number" char(10) UNIQUE,
-                "photo" bytea,
+                "photo_url" varchar(255),
+                "photo_public_id" varchar(255),
                 "school_id" uuid NOT NULL,
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
@@ -199,17 +215,15 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
             CREATE TABLE "teacher_qualifications" (
                 "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
                 "teacher_id" uuid NOT NULL,
-                "qualification_type" varchar(50),
-                "degree" varchar(100),
-                "institution" varchar(200),
+                "degree" varchar(100) NOT NULL,
+                "institution" varchar(255) NOT NULL,
+                "year_of_completion" integer NOT NULL,
                 "specialization" varchar(100),
-                "year_of_passing" integer,
-                "percentage" decimal(5,2),
-                "documents" jsonb,
-                "is_active" boolean DEFAULT true,
+                "achievements" text,
+                "certifications" text[],
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "fk_qualifications_teacher" FOREIGN KEY ("teacher_id") 
+                CONSTRAINT "fk_qualification_teacher" FOREIGN KEY ("teacher_id") 
                     REFERENCES "teachers"("id") ON DELETE CASCADE
             )
         `);
@@ -218,11 +232,11 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         await queryRunner.query(`
             CREATE TABLE "teacher_financial" (
                 "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "teacher_id" uuid NOT NULL,
+                "teacher_id" uuid NOT NULL UNIQUE,
                 "bank_account_number" varchar(20) UNIQUE NOT NULL,
                 "bank_name" varchar(50) NOT NULL,
-                "ifsc_code" char(11) NOT NULL,
-                "salary" numeric(10, 2),
+                "ifsc_code" varchar(11) NOT NULL,
+                "salary" numeric(10,2),
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
                 CONSTRAINT "fk_financial_teacher" FOREIGN KEY ("teacher_id") 
@@ -234,13 +248,13 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         await queryRunner.query(`
             CREATE TABLE "teacher_medicals" (
                 "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-                "teacher_id" uuid NOT NULL,
-                "blood_group" char(3) CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-')),
+                "teacher_id" uuid NOT NULL UNIQUE,
+                "blood_group" varchar(3) NOT NULL,
                 "medical_conditions" text,
                 "health_insurance" varchar(100),
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "fk_health_teacher" FOREIGN KEY ("teacher_id") 
+                CONSTRAINT "fk_medical_teacher" FOREIGN KEY ("teacher_id") 
                     REFERENCES "teachers"("id") ON DELETE CASCADE
             )
         `);
@@ -258,114 +272,12 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
                 "created_at" TIMESTAMP NOT NULL DEFAULT now(),
                 "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
                 CONSTRAINT "fk_work_history_teacher" FOREIGN KEY ("teacher_id") 
-                    REFERENCES "teachers"("id") ON DELETE CASCADE,
-                CONSTRAINT "check_work_history_dates" CHECK (end_date >= start_date OR end_date IS NULL)
+                    REFERENCES "teachers"("id") ON DELETE CASCADE
             )
         `);
-
-        // Create indexes
-        // Schools indexes
-        await queryRunner.query(`CREATE INDEX "idx_school_name" ON "schools"("name")`);
-
-        // Users indexes
-        await queryRunner.query(`CREATE INDEX "idx_user_email" ON "users"("email")`);
-        await queryRunner.query(`CREATE INDEX "idx_user_role" ON "users"("role")`);
-        await queryRunner.query(`CREATE INDEX "idx_user_name" ON "users"("firstName", "lastName")`);
-
-        // Students indexes
-        await queryRunner.query(`CREATE INDEX "idx_student_school" ON "students"("school_id")`);
-        await queryRunner.query(`CREATE INDEX "idx_student_name" ON "students"("first_name", "last_name")`);
-        await queryRunner.query(`CREATE INDEX "idx_student_status" ON "students"("status")`);
-        await queryRunner.query(`CREATE INDEX "idx_student_grade" ON "students"("grade")`);
-
-        // Fees indexes
-        await queryRunner.query(`CREATE INDEX "idx_student_fee_status" ON "student_fees"("payment_status")`);
-        await queryRunner.query(`CREATE INDEX "idx_student_fee_type" ON "student_fees"("fee_type")`);
-        await queryRunner.query(`CREATE INDEX "idx_student_fee_due_date" ON "student_fees"("due_date")`);
-
-        // Teachers and related tables indexes
-        await queryRunner.query(`CREATE INDEX "idx_teachers_name" ON "teachers"("first_name", "last_name")`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teachers_aadhar" ON "teachers"("aadhar_number")`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teachers_pan" ON "teachers"("pan_number")`);
-        await queryRunner.query(`CREATE INDEX "idx_teachers_school" ON "teachers"("school_id")`);
-
-        // Teacher Contact Information indexes
-        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teacher_contact_phone" ON "teacher_contact"("phone_number")`);
-        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teacher_contact_email" ON "teacher_contact"("email")`);
-        await queryRunner.query(`CREATE INDEX "idx_teacher_contact_teacher_id" ON "teacher_contact"("teacher_id")`);
-
-        // Teacher Professional Details indexes
-        await queryRunner.query(`CREATE INDEX "idx_teacher_professional_designation" ON "teacher_professional"("designation")`);
-        await queryRunner.query(`CREATE INDEX "idx_teacher_professional_subjects" ON "teacher_professional" USING GIN ("subjects_taught")`);
-        await queryRunner.query(`CREATE INDEX "idx_teacher_professional_classes" ON "teacher_professional" USING GIN ("classes_assigned")`);
-        await queryRunner.query(`CREATE INDEX "idx_teacher_professional_teacher_id" ON "teacher_professional"("teacher_id")`);
-
-        // Teacher Educational Qualifications indexes
-        await queryRunner.query(`CREATE INDEX "idx_teacher_qualifications_degree" ON "teacher_qualifications"("degree")`);
-        await queryRunner.query(`CREATE INDEX "idx_teacher_qualifications_institution" ON "teacher_qualifications"("institution")`);
-        await queryRunner.query(`CREATE INDEX "idx_teacher_qualifications_teacher_id" ON "teacher_qualifications"("teacher_id")`);
-
-        // Teacher Bank and Financial Details indexes
-        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teacher_financial_account" ON "teacher_financial"("bank_account_number")`);
-        await queryRunner.query(`CREATE INDEX "idx_teacher_financial_ifsc" ON "teacher_financial"("ifsc_code")`);
-        await queryRunner.query(`CREATE INDEX "idx_teacher_financial_teacher_id" ON "teacher_financial"("teacher_id")`);
-
-        // Teacher Health and Emergency Details indexes
-        await queryRunner.query(`CREATE INDEX "idx_teacher_medicals_blood_group" ON "teacher_medicals"("blood_group")`);
-        await queryRunner.query(`CREATE INDEX "idx_teacher_medicals_teacher_id" ON "teacher_medicals"("teacher_id")`);
-
-        // Teacher Work History indexes
-        await queryRunner.query(`CREATE INDEX "idx_work_history_teacher_id" ON "teacher_work_history"("teacher_id")`);
-        await queryRunner.query(`CREATE INDEX "idx_work_history_institution" ON "teacher_work_history"("institution_name")`);
-        await queryRunner.query(`CREATE INDEX "idx_work_history_dates" ON "teacher_work_history"("start_date", "end_date")`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // Drop indexes
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_work_history_dates"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_work_history_institution"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_work_history_teacher_id"`);
-
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_medicals_teacher_id"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_medicals_blood_group"`);
-
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_financial_teacher_id"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_financial_ifsc"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_financial_account"`);
-
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_qualifications_teacher_id"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_qualifications_institution"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_qualifications_degree"`);
-
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_professional_teacher_id"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_professional_classes"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_professional_subjects"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_professional_designation"`);
-
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_contact_teacher_id"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_contact_email"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_contact_phone"`);
-
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teachers_pan"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teachers_aadhar"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teachers_school"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teachers_name"`);
-
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_fee_due_date"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_fee_type"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_fee_status"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_grade"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_status"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_name"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_school"`);
-
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_name"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_role"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_email"`);
-
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_school_name"`);
-
-        // Drop tables in reverse order
         await queryRunner.query(`DROP TABLE IF EXISTS "teacher_work_history" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "teacher_medicals" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "teacher_financial" CASCADE`);
@@ -374,14 +286,12 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE IF EXISTS "teacher_contact" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "teachers" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "student_fees" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "student_emergency_contacts" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "student_medicals" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "student_academics" CASCADE`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "student_emergency_contacts" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "students" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "users" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "schools" CASCADE`);
-
-        // Drop enum type
-        await queryRunner.query(`DROP TYPE IF EXISTS "user_role_enum"`);
+        await queryRunner.query(`DROP TYPE IF EXISTS "user_role_enum" CASCADE`);
     }
 }

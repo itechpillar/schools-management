@@ -1,106 +1,188 @@
 import { Request, Response } from 'express';
 import { Teacher } from '../entities/Teacher';
-import { AppDataSource } from '../config/database';
+import { School } from '../entities/School';
+import AppDataSource from '../config/database';
 import { validate } from 'class-validator';
+import { handleError, AppError } from '../utils/errorHandler';
 
 const teacherRepository = AppDataSource.getRepository(Teacher);
+const schoolRepository = AppDataSource.getRepository(School);
 
-export const getAllTeachers = async (req: Request, res: Response) => {
-  try {
-    const teachers = await teacherRepository.find();
-    res.json({ data: teachers });
-  } catch (error) {
-    console.error('Error fetching teachers:', error);
-    res.status(500).json({ message: 'Error fetching teachers' });
-  }
+export const getAllTeachers = async (_req: Request, res: Response) => {
+    try {
+        const teachers = await teacherRepository.find({
+            relations: {
+                school: true,
+                contact: true,
+                professional_details: true,
+                qualifications: true,
+                financial: true
+            }
+        });
+
+        return res.json({
+            status: 'success',
+            data: teachers
+        });
+    } catch (error) {
+        return handleError(error, res);
+    }
 };
 
 export const getTeacherById = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const teacher = await teacherRepository.findOne({ where: { id } });
-    
-    if (!teacher) {
-      return res.status(404).json({ message: 'Teacher not found' });
-    }
+    try {
+        const { id } = req.params;
+        const teacher = await teacherRepository.findOne({
+            where: { id },
+            relations: {
+                school: true,
+                contact: true,
+                professional_details: true,
+                qualifications: true,
+                financial: true
+            }
+        });
 
-    res.json({ data: teacher });
-  } catch (error) {
-    console.error('Error fetching teacher:', error);
-    res.status(500).json({ message: 'Error fetching teacher' });
-  }
+        if (!teacher) {
+            throw new AppError(404, `Teacher with ID ${id} not found`);
+        }
+
+        return res.json({
+            status: 'success',
+            data: teacher
+        });
+    } catch (error) {
+        return handleError(error, res);
+    }
 };
 
 export const createTeacher = async (req: Request, res: Response) => {
-  try {
-    const {
-      first_name,
-      last_name,
-      gender,
-      date_of_birth,
-      aadhar_number,
-      pan_number,
-      school_id
-    } = req.body;
+    try {
+        const {
+            first_name,
+            last_name,
+            gender,
+            date_of_birth,
+            aadhar_number,
+            pan_number,
+            school_id
+        } = req.body;
 
-    const teacher = new Teacher();
-    teacher.first_name = first_name;
-    teacher.last_name = last_name;
-    teacher.gender = gender;
-    teacher.date_of_birth = date_of_birth;
-    teacher.aadhar_number = aadhar_number;
-    teacher.pan_number = pan_number;
-    teacher.school_id = school_id;
+        // First, find the school
+        const school = await schoolRepository.findOne({
+            where: { id: school_id }
+        });
 
-    const errors = await validate(teacher);
-    if (errors.length > 0) {
-      return res.status(400).json({ errors });
+        if (!school) {
+            throw new AppError(404, `School with ID ${school_id} not found`);
+        }
+
+        const teacher = teacherRepository.create({
+            first_name,
+            last_name,
+            gender,
+            date_of_birth,
+            aadhar_number,
+            pan_number,
+            school
+        });
+
+        const validationErrors = await validate(teacher);
+        if (validationErrors.length > 0) {
+            throw validationErrors;
+        }
+
+        const savedTeacher = await teacherRepository.save(teacher);
+
+        return res.status(201).json({
+            status: 'success',
+            message: 'Teacher created successfully',
+            data: savedTeacher
+        });
+    } catch (error) {
+        return handleError(error, res);
     }
-
-    await teacherRepository.save(teacher);
-    res.status(201).json({ data: teacher });
-  } catch (error) {
-    console.error('Error creating teacher:', error);
-    res.status(500).json({ message: 'Error creating teacher' });
-  }
 };
 
 export const updateTeacher = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const teacher = await teacherRepository.findOne({ where: { id } });
+    try {
+        const { id } = req.params;
+        const {
+            first_name,
+            last_name,
+            gender,
+            date_of_birth,
+            aadhar_number,
+            pan_number,
+            school_id
+        } = req.body;
 
-    if (!teacher) {
-      return res.status(404).json({ message: 'Teacher not found' });
+        const teacher = await teacherRepository.findOne({
+            where: { id }
+        });
+
+        if (!teacher) {
+            throw new AppError(404, `Teacher with ID ${id} not found`);
+        }
+
+        // If school_id is provided, find the school
+        let school = undefined;
+        if (school_id) {
+            school = await schoolRepository.findOne({
+                where: { id: school_id }
+            });
+
+            if (!school) {
+                throw new AppError(404, `School with ID ${school_id} not found`);
+            }
+        }
+
+        const updatedTeacher = teacherRepository.create({
+            ...teacher,
+            first_name,
+            last_name,
+            gender,
+            date_of_birth,
+            aadhar_number,
+            pan_number,
+            school: school || teacher.school
+        });
+
+        const validationErrors = await validate(updatedTeacher);
+        if (validationErrors.length > 0) {
+            throw validationErrors;
+        }
+
+        const savedTeacher = await teacherRepository.save(updatedTeacher);
+
+        return res.json({
+            status: 'success',
+            message: 'Teacher updated successfully',
+            data: savedTeacher
+        });
+    } catch (error) {
+        return handleError(error, res);
     }
-
-    teacherRepository.merge(teacher, req.body);
-    const errors = await validate(teacher);
-    if (errors.length > 0) {
-      return res.status(400).json({ errors });
-    }
-
-    await teacherRepository.save(teacher);
-    res.json({ data: teacher });
-  } catch (error) {
-    console.error('Error updating teacher:', error);
-    res.status(500).json({ message: 'Error updating teacher' });
-  }
 };
 
 export const deleteTeacher = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const teacher = await teacherRepository.findOne({ where: { id } });
+    try {
+        const { id } = req.params;
+        const teacher = await teacherRepository.findOne({
+            where: { id }
+        });
 
-    if (!teacher) {
-      return res.status(404).json({ message: 'Teacher not found' });
+        if (!teacher) {
+            throw new AppError(404, `Teacher with ID ${id} not found`);
+        }
+
+        await teacherRepository.remove(teacher);
+
+        return res.json({
+            status: 'success',
+            message: 'Teacher deleted successfully'
+        });
+    } catch (error) {
+        return handleError(error, res);
     }
-
-    await teacherRepository.remove(teacher);
-    res.json({ message: 'Teacher deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting teacher:', error);
-    res.status(500).json({ message: 'Error deleting teacher' });
-  }
 };

@@ -18,7 +18,7 @@ export class TeacherMedicals {
     @Column({ name: 'health_insurance', length: 100, nullable: true })
     healthInsurance: string;
 
-    @OneToOne(() => Teacher, teacher => teacher.medicals)
+    @OneToOne(() => Teacher, teacher => teacher.medical)
     @JoinColumn({ name: 'teacher_id' })
     teacher: Teacher;
 
