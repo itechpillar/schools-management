@@ -36,11 +36,8 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
                 "email" varchar(100) NOT NULL UNIQUE,
                 "password" varchar(100) NOT NULL,
                 "role" user_role_enum NOT NULL DEFAULT 'student',
-                "schoolId" uuid,
                 "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-                "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "fk_user_school" FOREIGN KEY ("schoolId") 
-                    REFERENCES "schools"("id") ON DELETE SET NULL
+                "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
             )
         `);
 
@@ -142,6 +139,130 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
             )
         `);
 
+        // Create teachers table
+        await queryRunner.query(`
+            CREATE TABLE "teachers" (
+                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "first_name" varchar(50) NOT NULL,
+                "last_name" varchar(50) NOT NULL,
+                "gender" char(1) CHECK (gender IN ('M', 'F', 'O')),
+                "date_of_birth" date NOT NULL,
+                "aadhar_number" char(12) UNIQUE NOT NULL,
+                "pan_number" char(10) UNIQUE,
+                "photo" bytea,
+                "school_id" uuid NOT NULL,
+                "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+                "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "fk_teacher_school" FOREIGN KEY ("school_id") 
+                    REFERENCES "schools"("id") ON DELETE CASCADE
+            )
+        `);
+
+        // Create teacher_contact table
+        await queryRunner.query(`
+            CREATE TABLE "teacher_contact" (
+                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "teacher_id" uuid NOT NULL,
+                "current_address" text NOT NULL,
+                "permanent_address" text,
+                "phone_number" varchar(15) UNIQUE NOT NULL,
+                "email" varchar(100) UNIQUE NOT NULL,
+                "emergency_contact" jsonb,
+                "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+                "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "fk_contact_teacher" FOREIGN KEY ("teacher_id") 
+                    REFERENCES "teachers"("id") ON DELETE CASCADE
+            )
+        `);
+
+        // Create teacher_professional table
+        await queryRunner.query(`
+            CREATE TABLE "teacher_professional" (
+                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "teacher_id" uuid NOT NULL,
+                "designation" varchar(50),
+                "subjects_taught" text[],
+                "classes_assigned" text[],
+                "joining_date" date,
+                "total_experience" integer,
+                "specialization" varchar(100),
+                "is_active" boolean DEFAULT true,
+                "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+                "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "fk_professional_teacher" FOREIGN KEY ("teacher_id") 
+                    REFERENCES "teachers"("id") ON DELETE CASCADE
+            )
+        `);
+
+        // Create teacher_qualifications table
+        await queryRunner.query(`
+            CREATE TABLE "teacher_qualifications" (
+                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "teacher_id" uuid NOT NULL,
+                "qualification_type" varchar(50),
+                "degree" varchar(100),
+                "institution" varchar(200),
+                "specialization" varchar(100),
+                "year_of_passing" integer,
+                "percentage" decimal(5,2),
+                "documents" jsonb,
+                "is_active" boolean DEFAULT true,
+                "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+                "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "fk_qualifications_teacher" FOREIGN KEY ("teacher_id") 
+                    REFERENCES "teachers"("id") ON DELETE CASCADE
+            )
+        `);
+
+        // Create teacher_financial table
+        await queryRunner.query(`
+            CREATE TABLE "teacher_financial" (
+                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "teacher_id" uuid NOT NULL,
+                "bank_account_number" varchar(20) UNIQUE NOT NULL,
+                "bank_name" varchar(50) NOT NULL,
+                "ifsc_code" char(11) NOT NULL,
+                "salary" numeric(10, 2),
+                "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+                "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "fk_financial_teacher" FOREIGN KEY ("teacher_id") 
+                    REFERENCES "teachers"("id") ON DELETE CASCADE
+            )
+        `);
+
+        // Create teacher_medicals table
+        await queryRunner.query(`
+            CREATE TABLE "teacher_medicals" (
+                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "teacher_id" uuid NOT NULL,
+                "blood_group" char(3) CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-')),
+                "medical_conditions" text,
+                "health_insurance" varchar(100),
+                "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+                "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "fk_health_teacher" FOREIGN KEY ("teacher_id") 
+                    REFERENCES "teachers"("id") ON DELETE CASCADE
+            )
+        `);
+
+        // Create teacher_work_history table
+        await queryRunner.query(`
+            CREATE TABLE "teacher_work_history" (
+                "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+                "teacher_id" uuid NOT NULL,
+                "institution_name" varchar(100) NOT NULL,
+                "designation" varchar(50),
+                "start_date" date NOT NULL,
+                "end_date" date,
+                "is_active" boolean DEFAULT true,
+                "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+                "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "fk_work_history_teacher" FOREIGN KEY ("teacher_id") 
+                    REFERENCES "teachers"("id") ON DELETE CASCADE,
+                CONSTRAINT "check_work_history_dates" CHECK (end_date >= start_date OR end_date IS NULL)
+            )
+        `);
+
         // Create indexes
         // Schools indexes
         await queryRunner.query(`CREATE INDEX "idx_school_name" ON "schools"("name")`);
@@ -149,7 +270,6 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         // Users indexes
         await queryRunner.query(`CREATE INDEX "idx_user_email" ON "users"("email")`);
         await queryRunner.query(`CREATE INDEX "idx_user_role" ON "users"("role")`);
-        await queryRunner.query(`CREATE INDEX "idx_user_school" ON "users"("schoolId")`);
         await queryRunner.query(`CREATE INDEX "idx_user_name" ON "users"("firstName", "lastName")`);
 
         // Students indexes
@@ -162,10 +282,75 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "idx_student_fee_status" ON "student_fees"("payment_status")`);
         await queryRunner.query(`CREATE INDEX "idx_student_fee_type" ON "student_fees"("fee_type")`);
         await queryRunner.query(`CREATE INDEX "idx_student_fee_due_date" ON "student_fees"("due_date")`);
+
+        // Teachers and related tables indexes
+        await queryRunner.query(`CREATE INDEX "idx_teachers_name" ON "teachers"("first_name", "last_name")`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teachers_aadhar" ON "teachers"("aadhar_number")`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teachers_pan" ON "teachers"("pan_number")`);
+        await queryRunner.query(`CREATE INDEX "idx_teachers_school" ON "teachers"("school_id")`);
+
+        // Teacher Contact Information indexes
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teacher_contact_phone" ON "teacher_contact"("phone_number")`);
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teacher_contact_email" ON "teacher_contact"("email")`);
+        await queryRunner.query(`CREATE INDEX "idx_teacher_contact_teacher_id" ON "teacher_contact"("teacher_id")`);
+
+        // Teacher Professional Details indexes
+        await queryRunner.query(`CREATE INDEX "idx_teacher_professional_designation" ON "teacher_professional"("designation")`);
+        await queryRunner.query(`CREATE INDEX "idx_teacher_professional_subjects" ON "teacher_professional" USING GIN ("subjects_taught")`);
+        await queryRunner.query(`CREATE INDEX "idx_teacher_professional_classes" ON "teacher_professional" USING GIN ("classes_assigned")`);
+        await queryRunner.query(`CREATE INDEX "idx_teacher_professional_teacher_id" ON "teacher_professional"("teacher_id")`);
+
+        // Teacher Educational Qualifications indexes
+        await queryRunner.query(`CREATE INDEX "idx_teacher_qualifications_degree" ON "teacher_qualifications"("degree")`);
+        await queryRunner.query(`CREATE INDEX "idx_teacher_qualifications_institution" ON "teacher_qualifications"("institution")`);
+        await queryRunner.query(`CREATE INDEX "idx_teacher_qualifications_teacher_id" ON "teacher_qualifications"("teacher_id")`);
+
+        // Teacher Bank and Financial Details indexes
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_teacher_financial_account" ON "teacher_financial"("bank_account_number")`);
+        await queryRunner.query(`CREATE INDEX "idx_teacher_financial_ifsc" ON "teacher_financial"("ifsc_code")`);
+        await queryRunner.query(`CREATE INDEX "idx_teacher_financial_teacher_id" ON "teacher_financial"("teacher_id")`);
+
+        // Teacher Health and Emergency Details indexes
+        await queryRunner.query(`CREATE INDEX "idx_teacher_medicals_blood_group" ON "teacher_medicals"("blood_group")`);
+        await queryRunner.query(`CREATE INDEX "idx_teacher_medicals_teacher_id" ON "teacher_medicals"("teacher_id")`);
+
+        // Teacher Work History indexes
+        await queryRunner.query(`CREATE INDEX "idx_work_history_teacher_id" ON "teacher_work_history"("teacher_id")`);
+        await queryRunner.query(`CREATE INDEX "idx_work_history_institution" ON "teacher_work_history"("institution_name")`);
+        await queryRunner.query(`CREATE INDEX "idx_work_history_dates" ON "teacher_work_history"("start_date", "end_date")`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         // Drop indexes
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_work_history_dates"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_work_history_institution"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_work_history_teacher_id"`);
+
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_medicals_teacher_id"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_medicals_blood_group"`);
+
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_financial_teacher_id"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_financial_ifsc"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_financial_account"`);
+
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_qualifications_teacher_id"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_qualifications_institution"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_qualifications_degree"`);
+
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_professional_teacher_id"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_professional_classes"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_professional_subjects"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_professional_designation"`);
+
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_contact_teacher_id"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_contact_email"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teacher_contact_phone"`);
+
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teachers_pan"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teachers_aadhar"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teachers_school"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_teachers_name"`);
+
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_fee_due_date"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_fee_type"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_fee_status"`);
@@ -173,13 +358,21 @@ export class CreateDatabase1700263000000 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_status"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_name"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_student_school"`);
+
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_name"`);
-        await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_school"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_role"`);
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_user_email"`);
+
         await queryRunner.query(`DROP INDEX IF EXISTS "idx_school_name"`);
 
         // Drop tables in reverse order
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_work_history" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_medicals" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_financial" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_qualifications" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_professional" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teacher_contact" CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "teachers" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "student_fees" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "student_medicals" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS "student_academics" CASCADE`);

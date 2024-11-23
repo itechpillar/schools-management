@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { User, UserRole } from '../../models/User';
+import { User, UserRole } from '../../entities/User';
 import { AuthController } from '../authController';
 import { testDataSource } from '../../test/setup';
 

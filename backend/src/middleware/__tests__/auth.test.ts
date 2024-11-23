@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { UserRole } from '../../models/User';
+import { UserRole } from '../../entities/User';
 import { auth } from '../auth';
 
 describe('Auth Middleware', () => {
@@ -51,15 +51,16 @@ describe('Auth Middleware', () => {
       nextFunction
     );
 
-    expect(nextFunction).toHaveBeenCalled();
-    const error = nextFunction.mock.calls[0][0];
-    expect(error.statusCode).toBe(401);
-    expect(error.message).toBe('Authentication required');
+    expect(nextFunction).not.toHaveBeenCalled();
+    expect(mockResponse.status).toHaveBeenCalledWith(401);
+    expect(mockResponse.json).toHaveBeenCalledWith({
+      message: 'Authentication required',
+    });
   });
 
-  it('should reject requests with invalid token', async () => {
+  it('should reject invalid tokens', async () => {
     mockRequest.headers = {
-      authorization: 'Bearer invalid-token',
+      authorization: 'Bearer invalid.token.here',
     };
 
     const middleware = auth();
@@ -69,16 +70,17 @@ describe('Auth Middleware', () => {
       nextFunction
     );
 
-    expect(nextFunction).toHaveBeenCalled();
-    const error = nextFunction.mock.calls[0][0];
-    expect(error.statusCode).toBe(401);
-    expect(error.message).toBe('Invalid or expired token');
+    expect(nextFunction).not.toHaveBeenCalled();
+    expect(mockResponse.status).toHaveBeenCalledWith(401);
+    expect(mockResponse.json).toHaveBeenCalledWith({
+      message: 'Invalid or expired token',
+    });
   });
 
-  it('should check role permissions', async () => {
+  it('should reject requests with insufficient role', async () => {
     const user = {
       id: '123',
-      role: UserRole.TEACHER,
+      role: UserRole.STUDENT,
     };
 
     const token = jwt.sign(user, process.env.JWT_SECRET || 'your-secret-key');
@@ -86,16 +88,17 @@ describe('Auth Middleware', () => {
       authorization: `Bearer ${token}`,
     };
 
-    const middleware = auth([UserRole.SUPER_ADMIN]);
+    const middleware = auth([UserRole.TEACHER]);
     await middleware(
       mockRequest as Request,
       mockResponse as Response,
       nextFunction
     );
 
-    expect(nextFunction).toHaveBeenCalled();
-    const error = nextFunction.mock.calls[0][0];
-    expect(error.statusCode).toBe(403);
-    expect(error.message).toBe('Insufficient permissions');
+    expect(nextFunction).not.toHaveBeenCalled();
+    expect(mockResponse.status).toHaveBeenCalledWith(403);
+    expect(mockResponse.json).toHaveBeenCalledWith({
+      message: 'Insufficient permissions',
+    });
   });
 });

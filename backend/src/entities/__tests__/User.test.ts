@@ -1,7 +1,7 @@
 import { User, UserRole } from '../User';
 import { testDataSource } from '../../test/setup';
 
-describe('User Model', () => {
+describe('User Entity', () => {
   let userRepository: any;
 
   beforeAll(() => {
@@ -50,23 +50,40 @@ describe('User Model', () => {
 
   it('should not allow duplicate emails', async () => {
     const user1 = userRepository.create({
-      firstName: 'User',
-      lastName: 'One',
-      email: 'duplicate@example.com',
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john@example.com',
       password: 'password123',
-      role: UserRole.STUDENT,
+      role: UserRole.TEACHER,
     });
 
     await userRepository.save(user1);
 
     const user2 = userRepository.create({
-      firstName: 'User',
-      lastName: 'Two',
-      email: 'duplicate@example.com',
+      firstName: 'Jane',
+      lastName: 'Doe',
+      email: 'john@example.com', // Same email
       password: 'password456',
       role: UserRole.STUDENT,
     });
 
     await expect(userRepository.save(user2)).rejects.toThrow();
+  });
+
+  it('should compare password correctly', async () => {
+    const user = userRepository.create({
+      firstName: 'John',
+      lastName: 'Doe',
+      email: 'john@example.com',
+      password: 'password123',
+      role: UserRole.TEACHER,
+    });
+
+    await userRepository.save(user);
+    const savedUser = await userRepository.findOne({ where: { email: 'john@example.com' } });
+
+    expect(savedUser).toBeDefined();
+    expect(await savedUser?.comparePassword('password123')).toBe(true);
+    expect(await savedUser?.comparePassword('wrongpassword')).toBe(false);
   });
 });

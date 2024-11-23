@@ -1,29 +1,33 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Student } from './Student';
+import { Teacher } from './Teacher';
 
 @Entity('schools')
 export class School {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
-  @Column()
-  name: string;
+    @Column()
+    name: string;
 
-  @Column()
-  address: string;
+    @Column()
+    address: string;
 
-  @Column({ name: 'contact_number' })
-  contactNumber: string;
+    @Column({ name: 'contact_number' })
+    contactNumber: string;
 
-  @Column()
-  email: string;
+    @Column()
+    email: string;
 
-  @OneToMany(() => Student, student => student.school)
-  students: Student[];
+    @OneToMany(() => Student, student => student.school)
+    students: Student[];
 
-  @CreateDateColumn()
-  created_at: Date;
+    @OneToMany(() => Teacher, teacher => teacher.school)
+    teachers: Teacher[];
 
-  @UpdateDateColumn()
-  updated_at: Date;
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
+
+    @UpdateDateColumn({ name: 'updated_at' })
+    updatedAt: Date;
 }
