@@ -43,8 +43,9 @@ interface BasicInfo {
   dateOfBirth: string;
   gender: string;
   grade: string;
-  schoolId: string | null;
+  schoolId: string; // Changed type to string
   status: 'active' | 'inactive';
+  parentEmail: string; // Add parent email field
 }
 
 interface AcademicInfo {
@@ -135,79 +136,109 @@ const StudentForm: React.FC<StudentFormProps> = ({
   const isSchoolAdmin = currentUser?.roles.includes('school_admin');
   const userSchoolId = currentUser?.schoolId || null;
 
-  // Form data states for each step
+  // Initialize basicInfo state with default values
   const [basicInfo, setBasicInfo] = useState<BasicInfo>({
     firstName: '',
     lastName: '',
     middleName: '',
-    dateOfBirth: '',
+    dateOfBirth: new Date().toISOString().split('T')[0],
     gender: '',
     grade: '',
-    schoolId: isSchoolAdmin && userSchoolId ? userSchoolId : null,
-    status: 'active'
+    schoolId: isSchoolAdmin && userSchoolId ? userSchoolId : '',  // Handle null case
+    status: 'active',
+    parentEmail: '',
   });
 
   useEffect(() => {
-    // Set school ID for school admin when component mounts or when currentUser changes
-    if (isSchoolAdmin && userSchoolId && !basicInfo.schoolId) {
+    // Set school ID when component mounts or when user changes
+    if (isSchoolAdmin && userSchoolId) {
       setBasicInfo(prev => ({
         ...prev,
-        schoolId: userSchoolId
+        schoolId: userSchoolId || ''  // Handle null case
       }));
     }
   }, [isSchoolAdmin, userSchoolId]);
 
+  // Update form data when editing student
+  useEffect(() => {
+    if (editingStudent) {
+      const {
+        firstName,
+        lastName,
+        middleName,
+        dateOfBirth,
+        gender,
+        grade,
+        schoolId,
+        status,
+        parentEmail,
+      } = editingStudent;
+
+      setBasicInfo({
+        firstName: firstName || '',
+        lastName: lastName || '',
+        middleName: middleName || '',
+        dateOfBirth: dateOfBirth || new Date().toISOString().split('T')[0],
+        gender: gender || '',
+        grade: grade || '',
+        schoolId: (isSchoolAdmin && userSchoolId ? userSchoolId : schoolId) || '',  // Handle null case
+        status: status || 'active',
+        parentEmail: parentEmail || '',
+      });
+    }
+  }, [editingStudent, userSchoolId, isSchoolAdmin]);
+
   const [academicInfo, setAcademicInfo] = useState<AcademicInfo>({
-    academicYear: '',
-    grade: '',
-    section: '',
-    rollNumber: '',
+    academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+    grade: '1',
+    section: 'A',
+    rollNumber: '001',
     previousSchool: '',
-    admissionDate: '',
-    board: '',
+    admissionDate: new Date().toISOString().split('T')[0],
+    board: 'State Board',
   });
 
   const [medicalInfo, setMedicalInfo] = useState<MedicalInfo>({
-    blood_group: '',
-    medical_conditions: '',
-    allergies: '',
-    medications: '',
-    immunizations: '',
-    emergency_contact_name: '',
-    emergency_contact_number: '',
-    family_doctor_name: '',
-    family_doctor_number: '',
-    preferred_hospital: '',
-    medical_insurance: '',
-    special_needs: '',
-    dietary_restrictions: '',
-    physical_disabilities: '',
-    last_physical_exam: '',
-    additional_notes: '',
+    blood_group: 'O+',
+    medical_conditions: 'None',
+    allergies: 'None',
+    medications: 'None',
+    immunizations: 'Up to date',
+    emergency_contact_name: 'Emergency Contact',
+    emergency_contact_number: '1234567890',
+    family_doctor_name: 'Dr. Smith',
+    family_doctor_number: '9876543210',
+    preferred_hospital: 'City Hospital',
+    medical_insurance: 'Yes',
+    special_needs: 'None',
+    dietary_restrictions: 'None',
+    physical_disabilities: 'None',
+    last_physical_exam: new Date().toISOString().split('T')[0],
+    additional_notes: 'None',
   });
 
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContacts>({
-    contact_name: '',
-    relationship: '',
-    phone_number: '',
-    email: '',
-    home_address: '',
-    alternate_contact_name: '',
-    alternate_contact_relationship: '',
-    alternate_contact_number: '',
-    communication_preference: ''
+    contact_name: 'Emergency Contact',
+    relationship: 'Parent',
+    phone_number: '1234567890',
+    email: 'emergency@example.com',
+    home_address: '123 Main St',
+    alternate_contact_name: 'Alternate Contact',
+    alternate_contact_relationship: 'Relative',
+    alternate_contact_number: '9876543210',
+    communication_preference: 'Phone',
   });
 
   const [feeStructure, setFeeStructure] = useState<FeeStructure>({
-    feeType: 'tuition',
-    academicYear: '',
-    term: '',
-    amount: '',
-    amountPaid: '',
-    balance: '',
-    dueDate: '',
-    paymentStatus: 'pending',
-    paymentMethod: 'cash',
+    feeType: 'Tuition',
+    academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+    term: '1',
+    amount: '10000',
+    amountPaid: '0',
+    balance: '10000',
+    dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+    paymentStatus: 'Pending',
+    paymentMethod: 'Cash',
     transactionId: '',
     receiptNumber: '',
     remarks: '',
@@ -217,35 +248,191 @@ const StudentForm: React.FC<StudentFormProps> = ({
     cancellationReason: ''
   });
 
+  // Set studentId when editingStudent changes
+  useEffect(() => {
+    if (editingStudent?.id) {
+      setStudentId(editingStudent.id);
+    }
+  }, [editingStudent]);
+
+  // Fetch student data when studentId changes
   useEffect(() => {
     const fetchStudentData = async () => {
-      if (editingStudent && studentId) {
+      if (studentId) {
         try {
+          setLoading(true);
+          setError(null);
+          
+          // Fetch basic info
           const response = await api.get(`/students/${studentId}`);
           const studentData = response.data.data;
-          
-          setBasicInfo({
-            firstName: studentData.firstName || '',
-            lastName: studentData.lastName || '',
-            middleName: studentData.middleName || '',
-            dateOfBirth: studentData.dateOfBirth ? new Date(studentData.dateOfBirth).toISOString().split('T')[0] : '',
+          console.log('Fetched student data:', studentData);
+
+          if (!studentData) {
+            throw new Error('No student data received');
+          }
+
+          // Update basic info with proper null handling
+          setBasicInfo(prevState => ({
+            ...prevState,
+            firstName: studentData.firstName || studentData.first_name || '',
+            lastName: studentData.lastName || studentData.last_name || '',
+            middleName: studentData.middleName || studentData.middle_name || '',
+            dateOfBirth: studentData.dateOfBirth || studentData.date_of_birth ? 
+              new Date(studentData.dateOfBirth || studentData.date_of_birth).toISOString().split('T')[0] : '',
             gender: studentData.gender || '',
             grade: studentData.grade || '',
-            schoolId: isSchoolAdmin && userSchoolId ? userSchoolId : studentData.schoolId || null,
-            status: studentData.status || 'active'
-          });
+            schoolId: (isSchoolAdmin && userSchoolId ? userSchoolId : (studentData.schoolId || studentData.school_id)) || '',
+            status: studentData.status || 'active',
+            parentEmail: studentData.parentEmail || studentData.parent_email || '',
+          }));
+
+          // Fetch and set academic info
+          try {
+            const academicResponse = await api.get(`/students/${studentId}/academics`);
+            if (academicResponse?.data?.data?.[0]) {
+              const academicData = academicResponse.data.data[0];
+              setAcademicInfo(prevState => ({
+                ...prevState,
+                academicYear: academicData.academicYear || academicData.academic_year || '',
+                grade: academicData.grade || '',
+                section: academicData.section || '',
+                rollNumber: academicData.rollNumber || academicData.roll_number || '',
+                previousSchool: academicData.previousSchool || academicData.previous_school || '',
+                admissionDate: academicData.admissionDate || academicData.admission_date ? 
+                  new Date(academicData.admissionDate || academicData.admission_date).toISOString().split('T')[0] : '',
+                board: academicData.board || ''
+              }));
+            } else {
+              // If no academic data exists, set default empty values
+              setAcademicInfo(prevState => ({
+                ...prevState,
+                academicYear: '',
+                grade: '',
+                section: '',
+                rollNumber: '',
+                previousSchool: '',
+                admissionDate: '',
+                board: ''
+              }));
+            }
+          } catch (error: any) {
+            // Handle 404 gracefully - this means no academic record exists yet
+            if (error.response?.status === 404) {
+              console.log('No academic record exists for this student yet');
+              setAcademicInfo(prevState => ({
+                ...prevState,
+                academicYear: '',
+                grade: '',
+                section: '',
+                rollNumber: '',
+                previousSchool: '',
+                admissionDate: '',
+                board: ''
+              }));
+            } else {
+              console.error('Error fetching academic info:', error);
+            }
+          }
+
+          // Fetch and set medical info
+          try {
+            const medicalResponse = await api.get(`/students/${studentId}/medicals`);
+            if (medicalResponse.data?.data?.[0]) {
+              const medicalData = medicalResponse.data.data[0];
+              setMedicalInfo(prevState => ({
+                ...prevState,
+                blood_group: medicalData.blood_group || medicalData.bloodGroup || '',
+                medical_conditions: medicalData.medical_conditions || medicalData.medicalConditions || '',
+                allergies: medicalData.allergies || '',
+                medications: medicalData.medications || '',
+                immunizations: medicalData.immunizations || '',
+                emergency_contact_name: medicalData.emergency_contact_name || medicalData.emergencyContactName || '',
+                emergency_contact_number: medicalData.emergency_contact_number || medicalData.emergencyContactNumber || '',
+                family_doctor_name: medicalData.family_doctor_name || medicalData.familyDoctorName || '',
+                family_doctor_number: medicalData.family_doctor_number || medicalData.familyDoctorNumber || '',
+                preferred_hospital: medicalData.preferred_hospital || medicalData.preferredHospital || '',
+                medical_insurance: medicalData.medical_insurance || medicalData.medicalInsurance || '',
+                special_needs: medicalData.special_needs || medicalData.specialNeeds || '',
+                dietary_restrictions: medicalData.dietary_restrictions || medicalData.dietaryRestrictions || '',
+                physical_disabilities: medicalData.physical_disabilities || medicalData.physicalDisabilities || '',
+                last_physical_exam: medicalData.last_physical_exam || medicalData.lastPhysicalExam ? 
+                  new Date(medicalData.last_physical_exam || medicalData.lastPhysicalExam).toISOString().split('T')[0] : '',
+                additional_notes: medicalData.additional_notes || medicalData.additionalNotes || ''
+              }));
+            }
+          } catch (error) {
+            console.error('Error fetching medical info:', error);
+          }
+
+          // Fetch and set emergency contacts
+          try {
+            const contactsResponse = await api.get(`/students/${studentId}/emergency-contacts`);
+            if (contactsResponse.data?.data?.[0]) {
+              const contactData = contactsResponse.data.data[0];
+              setEmergencyContacts(prevState => ({
+                ...prevState,
+                contact_name: contactData.contact_name || contactData.contactName || '',
+                relationship: contactData.relationship || '',
+                phone_number: contactData.phone_number || contactData.phoneNumber || '',
+                email: contactData.email || '',
+                home_address: contactData.home_address || contactData.homeAddress || '',
+                alternate_contact_name: contactData.alternate_contact_name || contactData.alternateContactName || '',
+                alternate_contact_relationship: contactData.alternate_contact_relationship || contactData.alternateContactRelationship || '',
+                alternate_contact_number: contactData.alternate_contact_number || contactData.alternateContactNumber || '',
+                communication_preference: contactData.communication_preference || contactData.communicationPreference || ''
+              }));
+            }
+          } catch (error) {
+            console.error('Error fetching emergency contacts:', error);
+          }
+
+          // Fetch and set fee structure
+          try {
+            const feesResponse = await api.get(`/students/${studentId}/fees`);
+            if (feesResponse.data?.data?.[0]) {
+              const feeData = feesResponse.data.data[0];
+              setFeeStructure(prevState => ({
+                ...prevState,
+                feeType: feeData.fee_type || feeData.feeType || '',
+                academicYear: feeData.academic_year || feeData.academicYear || '',
+                term: feeData.term || '',
+                amount: (feeData.amount || '').toString(),
+                amountPaid: (feeData.amount_paid || feeData.amountPaid || '').toString(),
+                balance: (feeData.balance || '').toString(),
+                dueDate: feeData.due_date || feeData.dueDate ? 
+                  new Date(feeData.due_date || feeData.dueDate).toISOString().split('T')[0] : '',
+                paymentStatus: feeData.payment_status || feeData.paymentStatus || '',
+                paymentMethod: feeData.payment_method || feeData.paymentMethod || '',
+                transactionId: feeData.transaction_id || feeData.transactionId || '',
+                receiptNumber: feeData.receipt_number || feeData.receiptNumber || '',
+                remarks: feeData.remarks || '',
+                paymentDate: feeData.payment_date || feeData.paymentDate ? 
+                  new Date(feeData.payment_date || feeData.paymentDate).toISOString().split('T')[0] : '',
+                collectedBy: feeData.collected_by || feeData.collectedBy || '',
+                isCancelled: feeData.is_cancelled || feeData.isCancelled || false,
+                cancellationReason: feeData.cancellation_reason || feeData.cancellationReason || ''
+              }));
+            }
+          } catch (error) {
+            console.error('Error fetching fee structure:', error);
+          }
+
+          setLoading(false);
         } catch (error) {
           console.error('Error fetching student data:', error);
+          setError('Error loading student data. Please try again.');
+          setLoading(false);
         }
       }
     };
 
-    fetchStudentData();
-  }, [editingStudent, studentId, isSchoolAdmin, userSchoolId]);
+    if (studentId) {
+      fetchStudentData();
+    }
+  }, [studentId, isSchoolAdmin, userSchoolId]);
 
   useEffect(() => {
-    if (!editingStudent?.id || !open) return;
-
     const loadStepData = async () => {
       try {
         switch (activeStep) {
@@ -254,14 +441,25 @@ const StudentForm: React.FC<StudentFormProps> = ({
             if (academicResponse.data?.data?.[0]) {
               const academicData = academicResponse.data.data[0];
               setAcademicInfo({
-                academicYear: academicData.academic_year || '',
+                academicYear: academicData.academicYear || academicData.academic_year || '',
                 grade: academicData.grade || '',
                 section: academicData.section || '',
-                rollNumber: academicData.roll_number || '',
-                previousSchool: academicData.previous_school || '',
-                admissionDate: academicData.admission_date ? 
-                  new Date(academicData.admission_date).toISOString().split('T')[0] : '',
+                rollNumber: academicData.rollNumber || academicData.roll_number || '',
+                previousSchool: academicData.previousSchool || academicData.previous_school || '',
+                admissionDate: academicData.admissionDate || academicData.admission_date ? 
+                  new Date(academicData.admissionDate || academicData.admission_date).toISOString().split('T')[0] : '',
                 board: academicData.board || ''
+              });
+            } else {
+              // If no academic data exists, set default empty values
+              setAcademicInfo({
+                academicYear: '',
+                grade: '',
+                section: '',
+                rollNumber: '',
+                previousSchool: '',
+                admissionDate: '',
+                board: ''
               });
             }
             break;
@@ -271,22 +469,23 @@ const StudentForm: React.FC<StudentFormProps> = ({
             if (medicalResponse.data?.data?.[0]) {
               const medicalData = medicalResponse.data.data[0];
               setMedicalInfo({
-                blood_group: medicalData.blood_group || '',
-                medical_conditions: medicalData.medical_conditions || '',
+                blood_group: medicalData.blood_group || medicalData.bloodGroup || '',
+                medical_conditions: medicalData.medical_conditions || medicalData.medicalConditions || '',
                 allergies: medicalData.allergies || '',
                 medications: medicalData.medications || '',
                 immunizations: medicalData.immunizations || '',
-                emergency_contact_name: medicalData.emergency_contact_name || '',
-                emergency_contact_number: medicalData.emergency_contact_number || '',
-                family_doctor_name: medicalData.family_doctor_name || '',
-                family_doctor_number: medicalData.family_doctor_number || '',
-                preferred_hospital: medicalData.preferred_hospital || '',
-                medical_insurance: medicalData.medical_insurance || '',
-                special_needs: medicalData.special_needs || '',
-                dietary_restrictions: medicalData.dietary_restrictions || '',
-                physical_disabilities: medicalData.physical_disabilities || '',
-                last_physical_exam: medicalData.last_physical_exam || '',
-                additional_notes: medicalData.additional_notes || ''
+                emergency_contact_name: medicalData.emergency_contact_name || medicalData.emergencyContactName || '',
+                emergency_contact_number: medicalData.emergency_contact_number || medicalData.emergencyContactNumber || '',
+                family_doctor_name: medicalData.family_doctor_name || medicalData.familyDoctorName || '',
+                family_doctor_number: medicalData.family_doctor_number || medicalData.familyDoctorNumber || '',
+                preferred_hospital: medicalData.preferred_hospital || medicalData.preferredHospital || '',
+                medical_insurance: medicalData.medical_insurance || medicalData.medicalInsurance || '',
+                special_needs: medicalData.special_needs || medicalData.specialNeeds || '',
+                dietary_restrictions: medicalData.dietary_restrictions || medicalData.dietaryRestrictions || '',
+                physical_disabilities: medicalData.physical_disabilities || medicalData.physicalDisabilities || '',
+                last_physical_exam: medicalData.last_physical_exam || medicalData.lastPhysicalExam ? 
+                  new Date(medicalData.last_physical_exam || medicalData.lastPhysicalExam).toISOString().split('T')[0] : '',
+                additional_notes: medicalData.additional_notes || medicalData.additionalNotes || ''
               });
             }
             break;
@@ -296,15 +495,15 @@ const StudentForm: React.FC<StudentFormProps> = ({
             if (contactsResponse.data?.data?.[0]) {
               const contactData = contactsResponse.data.data[0];
               setEmergencyContacts({
-                contact_name: contactData.contact_name || '',
+                contact_name: contactData.contact_name || contactData.contactName || '',
                 relationship: contactData.relationship || '',
-                phone_number: contactData.phone_number || '',
+                phone_number: contactData.phone_number || contactData.phoneNumber || '',
                 email: contactData.email || '',
-                home_address: contactData.home_address || '',
-                alternate_contact_name: contactData.alternate_contact_name || '',
-                alternate_contact_relationship: contactData.alternate_contact_relationship || '',
-                alternate_contact_number: contactData.alternate_contact_number || '',
-                communication_preference: contactData.communication_preference || ''
+                home_address: contactData.home_address || contactData.homeAddress || '',
+                alternate_contact_name: contactData.alternate_contact_name || contactData.alternateContactName || '',
+                alternate_contact_relationship: contactData.alternate_contact_relationship || contactData.alternateContactRelationship || '',
+                alternate_contact_number: contactData.alternate_contact_number || contactData.alternateContactNumber || '',
+                communication_preference: contactData.communication_preference || contactData.communicationPreference || ''
               });
             }
             break;
@@ -314,28 +513,35 @@ const StudentForm: React.FC<StudentFormProps> = ({
             if (feeResponse.data?.data?.[0]) {
               const feeData = feeResponse.data.data[0];
               setFeeStructure({
-                feeType: feeData.fee_type || 'tuition',
-                academicYear: feeData.academic_year || '',
+                feeType: feeData.fee_type || feeData.feeType || '',
+                academicYear: feeData.academic_year || feeData.academicYear || '',
                 term: feeData.term || '',
-                amount: feeData.amount?.toString() || '',
-                amountPaid: feeData.amount_paid?.toString() || '',
-                balance: feeData.balance?.toString() || '',
-                dueDate: feeData.due_date || '',
-                paymentStatus: feeData.payment_status || 'pending',
-                paymentMethod: feeData.payment_method || 'cash',
-                transactionId: feeData.transaction_id || '',
-                receiptNumber: feeData.receipt_number || '',
+                amount: (feeData.amount || '').toString(),
+                amountPaid: (feeData.amount_paid || feeData.amountPaid || '').toString(),
+                balance: (feeData.balance || '').toString(),
+                dueDate: feeData.due_date || feeData.dueDate ? 
+                  new Date(feeData.due_date || feeData.dueDate).toISOString().split('T')[0] : '',
+                paymentStatus: feeData.payment_status || feeData.paymentStatus || '',
+                paymentMethod: feeData.payment_method || feeData.paymentMethod || '',
+                transactionId: feeData.transaction_id || feeData.transactionId || '',
+                receiptNumber: feeData.receipt_number || feeData.receiptNumber || '',
                 remarks: feeData.remarks || '',
-                paymentDate: feeData.payment_date || '',
-                collectedBy: feeData.collected_by || '',
-                isCancelled: feeData.is_cancelled || false,
-                cancellationReason: feeData.cancellation_reason || ''
+                paymentDate: feeData.payment_date || feeData.paymentDate ? 
+                  new Date(feeData.payment_date || feeData.paymentDate).toISOString().split('T')[0] : '',
+                collectedBy: feeData.collected_by || feeData.collectedBy || '',
+                isCancelled: feeData.is_cancelled || feeData.isCancelled || false,
+                cancellationReason: feeData.cancellation_reason || feeData.cancellationReason || ''
               });
             }
             break;
         }
-      } catch (error) {
-        console.error(`Error loading data for step ${activeStep}:`, error);
+      } catch (error: any) {
+        // Handle 404 gracefully - this means no academic record exists yet
+        if (error.response?.status === 404) {
+          console.log('No record exists for this student yet');
+        } else {
+          console.error(`Error loading data for step ${activeStep}:`, error);
+        }
       }
     };
 
@@ -345,7 +551,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
   const handleInputChange = (section: string, field: string, value: any) => {
     switch (section) {
       case 'basic':
-        setBasicInfo((prev: BasicInfo) => ({ ...prev, [field]: value }));
+        setBasicInfo((prev: BasicInfo) => ({ ...prev, [field]: value || '' }));
         break;
       case 'academic':
         setAcademicInfo((prev: AcademicInfo) => ({ ...prev, [field]: value }));
@@ -365,38 +571,92 @@ const StudentForm: React.FC<StudentFormProps> = ({
   const validateStep = () => {
     switch (activeStep) {
       case 0:
-        if (!basicInfo.firstName || !basicInfo.lastName || !basicInfo.dateOfBirth || 
-            !basicInfo.gender || !basicInfo.grade || !basicInfo.schoolId) {
-          setError('Please fill in all required fields');
+        // Log the values for debugging
+        console.log('Validating Basic Info:', {
+          firstName: basicInfo.firstName,
+          lastName: basicInfo.lastName,
+          dateOfBirth: basicInfo.dateOfBirth,
+          gender: basicInfo.gender,
+          grade: basicInfo.grade,
+          schoolId: basicInfo.schoolId
+        });
+        
+        if (!basicInfo.firstName?.trim() || 
+            !basicInfo.lastName?.trim() || 
+            !basicInfo.dateOfBirth?.trim() || 
+            !basicInfo.gender?.trim() || 
+            !basicInfo.grade?.trim() || 
+            !basicInfo.schoolId?.toString().trim()) {  // Convert to string and check if empty
+          const missingFields = [];
+          if (!basicInfo.firstName?.trim()) missingFields.push('First Name');
+          if (!basicInfo.lastName?.trim()) missingFields.push('Last Name');
+          if (!basicInfo.dateOfBirth?.trim()) missingFields.push('Date of Birth');
+          if (!basicInfo.gender?.trim()) missingFields.push('Gender');
+          if (!basicInfo.grade?.trim()) missingFields.push('Grade');
+          if (!basicInfo.schoolId?.toString().trim()) missingFields.push('School');
+          
+          setError(`Please fill in the following required fields: ${missingFields.join(', ')}`);
           return false;
         }
         break;
       case 1:
-        const missingAcademicFields = [];
-        if (!academicInfo.academicYear?.trim()) missingAcademicFields.push('Academic Year');
-        if (!academicInfo.grade?.trim()) missingAcademicFields.push('Grade');
-        if (!academicInfo.section?.trim()) missingAcademicFields.push('Section');
-        if (!academicInfo.rollNumber?.trim()) missingAcademicFields.push('Roll Number');
-
-        if (missingAcademicFields.length > 0) {
-          setError(`Please fill in the following required fields: ${missingAcademicFields.join(', ')}`);
+        if (!academicInfo.academicYear || !academicInfo.grade || !academicInfo.section) {
+          setError('Please fill in all required fields: Academic Year, Grade, and Section are required');
           return false;
         }
         break;
+      case 2:
+        // Add medical info validation if needed
+        break;
       case 3:
-        const missingEmergencyFields = [];
-        if (!emergencyContacts.contact_name?.trim()) missingEmergencyFields.push('Contact Name');
-        if (!emergencyContacts.relationship?.trim()) missingEmergencyFields.push('Relationship');
-        if (!emergencyContacts.phone_number?.trim()) missingEmergencyFields.push('Phone Number');
-        if (!emergencyContacts.home_address?.trim()) missingEmergencyFields.push('Home Address');
-
-        if (missingEmergencyFields.length > 0) {
-          setError(`Please fill in the following required fields: ${missingEmergencyFields.join(', ')}`);
+        if (!emergencyContacts.contact_name || !emergencyContacts.relationship || !emergencyContacts.phone_number) {
+          setError('Please fill in all required emergency contact fields');
+          return false;
+        }
+        break;
+      case 4:
+        if (!feeStructure.feeType || !feeStructure.academicYear || !feeStructure.amount || !feeStructure.dueDate) {
+          setError('Please fill in all required fee structure fields');
           return false;
         }
         break;
     }
     return true;
+  };
+
+  const getDataForStep = (step: number) => {
+    switch (step) {
+      case 0:
+        return {
+          firstName: basicInfo.firstName,
+          lastName: basicInfo.lastName,
+          middleName: basicInfo.middleName,
+          dateOfBirth: basicInfo.dateOfBirth,
+          gender: basicInfo.gender,
+          grade: basicInfo.grade,
+          schoolId: basicInfo.schoolId,
+          status: basicInfo.status,
+          parentEmail: basicInfo.parentEmail,
+        };
+      case 1:
+        return {
+          academic_year: academicInfo.academicYear,
+          grade: academicInfo.grade,
+          section: academicInfo.section,
+          roll_number: academicInfo.rollNumber,
+          previous_school: academicInfo.previousSchool,
+          admission_date: academicInfo.admissionDate,
+          board: academicInfo.board,
+        };
+      case 2:
+        return medicalInfo;
+      case 3:
+        return emergencyContacts;
+      case 4:
+        return feeStructure;
+      default:
+        return {};
+    }
   };
 
   const resetForm = () => {
@@ -407,60 +667,61 @@ const StudentForm: React.FC<StudentFormProps> = ({
       firstName: '',
       middleName: '',
       lastName: '',
-      dateOfBirth: '',
+      dateOfBirth: new Date().toISOString().split('T')[0],
       gender: '',
       grade: '',
-      schoolId: isSchoolAdmin && userSchoolId ? userSchoolId : null,
+      schoolId: isSchoolAdmin && userSchoolId ? userSchoolId || '' : '',  // Handle null case
       status: 'active',
+      parentEmail: '',
     });
     setAcademicInfo({
-      academicYear: '',
-      grade: '',
-      section: '',
-      rollNumber: '',
+      academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+      grade: '1',
+      section: 'A',
+      rollNumber: '001',
       previousSchool: '',
-      admissionDate: '',
-      board: '',
+      admissionDate: new Date().toISOString().split('T')[0],
+      board: 'State Board',
     });
     setMedicalInfo({
-      blood_group: '',
-      medical_conditions: '',
-      allergies: '',
-      medications: '',
-      immunizations: '',
-      emergency_contact_name: '',
-      emergency_contact_number: '',
-      family_doctor_name: '',
-      family_doctor_number: '',
-      preferred_hospital: '',
-      medical_insurance: '',
-      special_needs: '',
-      dietary_restrictions: '',
-      physical_disabilities: '',
-      last_physical_exam: '',
-      additional_notes: '',
+      blood_group: 'O+',
+      medical_conditions: 'None',
+      allergies: 'None',
+      medications: 'None',
+      immunizations: 'Up to date',
+      emergency_contact_name: 'Emergency Contact',
+      emergency_contact_number: '1234567890',
+      family_doctor_name: 'Dr. Smith',
+      family_doctor_number: '9876543210',
+      preferred_hospital: 'City Hospital',
+      medical_insurance: 'Yes',
+      special_needs: 'None',
+      dietary_restrictions: 'None',
+      physical_disabilities: 'None',
+      last_physical_exam: new Date().toISOString().split('T')[0],
+      additional_notes: 'None',
     });
     setEmergencyContacts({
-      contact_name: '',
-      relationship: '',
-      phone_number: '',
-      email: '',
-      home_address: '',
-      alternate_contact_name: '',
-      alternate_contact_relationship: '',
-      alternate_contact_number: '',
-      communication_preference: ''
+      contact_name: 'Emergency Contact',
+      relationship: 'Parent',
+      phone_number: '1234567890',
+      email: 'emergency@example.com',
+      home_address: '123 Main St',
+      alternate_contact_name: 'Alternate Contact',
+      alternate_contact_relationship: 'Relative',
+      alternate_contact_number: '9876543210',
+      communication_preference: 'Phone',
     });
     setFeeStructure({
-      feeType: 'tuition',
-      academicYear: '',
-      term: '',
-      amount: '',
-      amountPaid: '',
-      balance: '',
-      dueDate: '',
-      paymentStatus: 'pending',
-      paymentMethod: 'cash',
+      feeType: 'Tuition',
+      academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+      term: '1',
+      amount: '10000',
+      amountPaid: '0',
+      balance: '10000',
+      dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0],
+      paymentStatus: 'Pending',
+      paymentMethod: 'Cash',
       transactionId: '',
       receiptNumber: '',
       remarks: '',
@@ -486,6 +747,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
         grade: basicInfo.grade,
         schoolId: basicInfo.schoolId || '',
         status: basicInfo.status,
+        parentEmail: basicInfo.parentEmail, // Add parent email field
       };
 
       let response;
@@ -494,10 +756,6 @@ const StudentForm: React.FC<StudentFormProps> = ({
       } else {
         response = await api.post('/students', studentData);
         setStudentId(response.data.data.id);
-      }
-
-      if (onComplete) {
-        onComplete(response.data);
       }
 
       setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -522,7 +780,7 @@ const StudentForm: React.FC<StudentFormProps> = ({
       case 0:
         return 'basic';
       case 1:
-        return 'academic';
+        return 'academics';
       case 2:
         return 'medicals';
       case 3:
@@ -534,17 +792,91 @@ const StudentForm: React.FC<StudentFormProps> = ({
     }
   };
 
-  const getDataForStep = (step: number): any => {
-    console.log('Getting data for step:', step);
-    const data: Record<number, any> = {
-      0: basicInfo,
-      1: academicInfo,
-      2: medicalInfo,
-      3: emergencyContacts,
-      4: feeStructure
-    };
-    console.log('Step data:', data[step]);
-    return data[step] || {};
+  const handleNext = async () => {
+    try {
+      if (!validateStep()) {
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      // Save data for the current step
+      const endpoint = getEndpointForStep(activeStep);
+      const data = getDataForStep(activeStep);
+
+      // Only save basic info when creating a new student
+      if (activeStep === 0) {
+        if (!editingStudent) {
+          const studentData = {
+            firstName: basicInfo.firstName,
+            lastName: basicInfo.lastName,
+            middleName: basicInfo.middleName,
+            dateOfBirth: basicInfo.dateOfBirth,
+            gender: basicInfo.gender,
+            grade: basicInfo.grade,
+            schoolId: basicInfo.schoolId,
+            status: basicInfo.status,
+            parentEmail: basicInfo.parentEmail,
+          };
+
+          const response = await api.post('/students', studentData);
+          setStudentId(response.data.data.id);
+        } else {
+          // Update basic info for existing student
+          await api.put(`/students/${studentId}`, data);
+        }
+      } else if (studentId) {
+        // Save data for other steps
+        try {
+          // For a new student or when no data exists, directly use POST
+          if (!editingStudent) {
+            await api.post(`/students/${studentId}/${endpoint}`, data);
+          } else {
+            // For existing students, check if data exists
+            const existingData = await api.get(`/students/${studentId}/${endpoint}`);
+            if (existingData.data?.data?.[0]?.id) {
+              await api.put(`/students/${studentId}/${endpoint}/${existingData.data.data[0].id}`, data);
+            } else {
+              await api.post(`/students/${studentId}/${endpoint}`, data);
+            }
+          }
+        } catch (error: any) {
+          // If there's a 404 error (no data exists), use POST
+          if (error.response?.status === 404) {
+            await api.post(`/students/${studentId}/${endpoint}`, data);
+          } else {
+            throw error; // Re-throw other errors to be caught by the outer try-catch
+          }
+        }
+      }
+
+      const isLastStep = activeStep === steps.length - 1;
+      
+      if (isLastStep) {
+        // Only call onComplete and close form on the last step
+        if (onComplete) {
+          onComplete({ data: { id: studentId } });
+        }
+        handleClose();
+        return;
+      }
+
+      setActiveStep((prevActiveStep) => prevActiveStep + 1);
+      setLoading(false);
+    } catch (error: any) {
+      setLoading(false);
+      if (error.response?.status === 403) {
+        setError('You do not have permission to perform this action. Please check your role and assigned school.');
+      } else {
+        setError(error.response?.data?.message || 'An error occurred while saving data');
+      }
+    }
+  };
+
+  const closeForm = () => {
+    resetForm();
+    handleClose();
   };
 
   const renderBasicInfoStep = () => (
@@ -600,6 +932,29 @@ const StudentForm: React.FC<StudentFormProps> = ({
           </Select>
         </FormControl>
       </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          required
+          fullWidth
+          label="Parent Email"
+          value={basicInfo.parentEmail}
+          onChange={(e) => handleInputChange('basic', 'parentEmail', e.target.value)}
+          error={!!error && !basicInfo.parentEmail}
+          helperText={!!error && !basicInfo.parentEmail ? 'Parent email is required' : ''}
+        />
+      </Grid>
+      {isSchoolAdmin && (
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="School"
+            value={schools.find(school => school.id === userSchoolId)?.name || ''}
+            InputProps={{
+              readOnly: true,
+            }}
+          />
+        </Grid>
+      )}
       {!isSchoolAdmin && (
         <Grid item xs={12} sm={6}>
           <FormControl fullWidth required>
@@ -610,24 +965,6 @@ const StudentForm: React.FC<StudentFormProps> = ({
               label="School"
             >
               {schools.map((school) => (
-                <MenuItem key={school.id} value={school.id}>
-                  {school.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
-      )}
-      {isSchoolAdmin && (
-        <Grid item xs={12} sm={6}>
-          <FormControl fullWidth>
-            <InputLabel>School</InputLabel>
-            <Select
-              value={basicInfo.schoolId}
-              label="School"
-              disabled
-            >
-              {schools.filter(school => school.id === userSchoolId).map((school) => (
                 <MenuItem key={school.id} value={school.id}>
                   {school.name}
                 </MenuItem>
@@ -1196,311 +1533,6 @@ const StudentForm: React.FC<StudentFormProps> = ({
         return renderFeeStructureStep();
       default:
         return null;
-    }
-  };
-
-  const closeForm = () => {
-    resetForm();
-    handleClose();
-  };
-
-  const handleNext = async () => {
-    try {
-      // If we're on the last step and moving forward, don't submit again
-      if (activeStep === steps.length - 1) {
-        handleClose();
-        return;
-      }
-
-      // Validate current step
-      if (!validateStep()) {
-        return;
-      }
-
-      // Handle step-specific submissions
-      switch (activeStep) {
-        case 0:
-          const studentData = {
-            firstName: basicInfo.firstName,
-            lastName: basicInfo.lastName,
-            middleName: basicInfo.middleName,
-            dateOfBirth: basicInfo.dateOfBirth,
-            gender: basicInfo.gender,
-            grade: basicInfo.grade,
-            schoolId: basicInfo.schoolId,
-            status: basicInfo.status,
-          };
-
-          console.log('Submitting student data:', studentData);
-          
-          try {
-            let response;
-            if (editingStudent) {
-              response = await api.put(`/students/${studentId}`, studentData);
-            } else {
-              response = await api.post('/students', studentData);
-              setStudentId(response.data.data.id);
-            }
-            
-            console.log('API Response:', response.data);
-            
-            if (!response.data.data) {
-              throw new Error('No data received from the server');
-            }
-          } catch (error: any) {
-            const axiosError = error as AxiosError<any>;
-            console.error('API Error:', axiosError.response?.data || axiosError.message);
-            if (axiosError.response?.status === 403) {
-              setError('You do not have permission to perform this action. Please check your role and assigned school.');
-            } else {
-              setError(axiosError.response?.data?.message || 'Error creating student. Please try again.');
-            }
-            setLoading(false);
-            return;
-          }
-          break;
-        case 1:
-          if (editingStudent) {
-            // First get the existing academic record
-            const academicResponse = await api.get(`/students/${studentId}/academics`);
-            const academicId = academicResponse.data?.data?.[0]?.id;
-
-            if (academicId) {
-              // Update existing academic record
-              await api.put(`/students/${studentId}/academics/${academicId}`, {
-                academic_year: academicInfo.academicYear,
-                grade: academicInfo.grade,
-                section: academicInfo.section,
-                roll_number: academicInfo.rollNumber,
-                previous_school: academicInfo.previousSchool,
-                admission_date: academicInfo.admissionDate ? new Date(academicInfo.admissionDate).toISOString().split('T')[0] : null,
-                board: academicInfo.board
-              });
-            } else {
-              // Create new academic record if none exists
-              await api.post(`/students/${studentId}/academics`, {
-                academic_year: academicInfo.academicYear,
-                grade: academicInfo.grade,
-                section: academicInfo.section,
-                roll_number: academicInfo.rollNumber,
-                previous_school: academicInfo.previousSchool,
-                admission_date: academicInfo.admissionDate ? new Date(academicInfo.admissionDate).toISOString().split('T')[0] : null,
-                board: academicInfo.board
-              });
-            }
-          } else {
-            // Create new academic record for new student
-            await api.post(`/students/${studentId}/academics`, {
-              academic_year: academicInfo.academicYear,
-              grade: academicInfo.grade,
-              section: academicInfo.section,
-              roll_number: academicInfo.rollNumber,
-              previous_school: academicInfo.previousSchool,
-              admission_date: academicInfo.admissionDate ? new Date(academicInfo.admissionDate).toISOString().split('T')[0] : null,
-              board: academicInfo.board
-            });
-          }
-          break;
-
-        case 2:
-          if (editingStudent) {
-            // First get the existing medical record
-            const medicalResponse = await api.get(`/students/${studentId}/medicals`);
-            const medicalId = medicalResponse.data?.data?.[0]?.id;
-
-            if (medicalId) {
-              // Update existing medical record
-              await api.put(`/students/${studentId}/medicals/${medicalId}`, {
-                blood_group: medicalInfo.blood_group,
-                medical_conditions: medicalInfo.medical_conditions,
-                allergies: medicalInfo.allergies,
-                medications: medicalInfo.medications,
-                immunizations: medicalInfo.immunizations,
-                emergency_contact_name: medicalInfo.emergency_contact_name,
-                emergency_contact_number: medicalInfo.emergency_contact_number,
-                family_doctor_name: medicalInfo.family_doctor_name,
-                family_doctor_number: medicalInfo.family_doctor_number,
-                preferred_hospital: medicalInfo.preferred_hospital,
-                medical_insurance: medicalInfo.medical_insurance,
-                special_needs: medicalInfo.special_needs,
-                dietary_restrictions: medicalInfo.dietary_restrictions,
-                physical_disabilities: medicalInfo.physical_disabilities,
-                last_physical_exam: medicalInfo.last_physical_exam,
-                additional_notes: medicalInfo.additional_notes
-              });
-            } else {
-              // Create new medical record if none exists
-              await api.post(`/students/${studentId}/medicals`, {
-                blood_group: medicalInfo.blood_group,
-                medical_conditions: medicalInfo.medical_conditions,
-                allergies: medicalInfo.allergies,
-                medications: medicalInfo.medications,
-                immunizations: medicalInfo.immunizations,
-                emergency_contact_name: medicalInfo.emergency_contact_name,
-                emergency_contact_number: medicalInfo.emergency_contact_number,
-                family_doctor_name: medicalInfo.family_doctor_name,
-                family_doctor_number: medicalInfo.family_doctor_number,
-                preferred_hospital: medicalInfo.preferred_hospital,
-                medical_insurance: medicalInfo.medical_insurance,
-                special_needs: medicalInfo.special_needs,
-                dietary_restrictions: medicalInfo.dietary_restrictions,
-                physical_disabilities: medicalInfo.physical_disabilities,
-                last_physical_exam: medicalInfo.last_physical_exam,
-                additional_notes: medicalInfo.additional_notes
-              });
-            }
-          } else {
-            // Create new medical record for new student
-            await api.post(`/students/${studentId}/medicals`, {
-              blood_group: medicalInfo.blood_group,
-              medical_conditions: medicalInfo.medical_conditions,
-              allergies: medicalInfo.allergies,
-              medications: medicalInfo.medications,
-              immunizations: medicalInfo.immunizations,
-              emergency_contact_name: medicalInfo.emergency_contact_name,
-              emergency_contact_number: medicalInfo.emergency_contact_number,
-              family_doctor_name: medicalInfo.family_doctor_name,
-              family_doctor_number: medicalInfo.family_doctor_number,
-              preferred_hospital: medicalInfo.preferred_hospital,
-              medical_insurance: medicalInfo.medical_insurance,
-              special_needs: medicalInfo.special_needs,
-              dietary_restrictions: medicalInfo.dietary_restrictions,
-              physical_disabilities: medicalInfo.physical_disabilities,
-              last_physical_exam: medicalInfo.last_physical_exam,
-              additional_notes: medicalInfo.additional_notes
-            });
-          }
-          break;
-
-        case 3:
-          if (editingStudent) {
-            // First get the existing emergency contact record
-            const contactsResponse = await api.get(`/students/${studentId}/emergency-contacts`);
-            const contactId = contactsResponse.data?.data?.[0]?.id;
-
-            if (contactId) {
-              // Update existing emergency contact
-              await api.put(`/students/${studentId}/emergency-contacts/${contactId}`, {
-                contact_name: emergencyContacts.contact_name,
-                relationship: emergencyContacts.relationship,
-                phone_number: emergencyContacts.phone_number,
-                email: emergencyContacts.email,
-                home_address: emergencyContacts.home_address,
-                alternate_contact_name: emergencyContacts.alternate_contact_name,
-                alternate_contact_relationship: emergencyContacts.alternate_contact_relationship,
-                alternate_contact_number: emergencyContacts.alternate_contact_number,
-                communication_preference: emergencyContacts.communication_preference
-              });
-            } else {
-              // Create new emergency contact if none exists
-              await api.post(`/students/${studentId}/emergency-contacts`, {
-                contact_name: emergencyContacts.contact_name,
-                relationship: emergencyContacts.relationship,
-                phone_number: emergencyContacts.phone_number,
-                email: emergencyContacts.email,
-                home_address: emergencyContacts.home_address,
-                alternate_contact_name: emergencyContacts.alternate_contact_name,
-                alternate_contact_relationship: emergencyContacts.alternate_contact_relationship,
-                alternate_contact_number: emergencyContacts.alternate_contact_number,
-                communication_preference: emergencyContacts.communication_preference
-              });
-            }
-          } else {
-            // Create new emergency contact for new student
-            await api.post(`/students/${studentId}/emergency-contacts`, {
-              contact_name: emergencyContacts.contact_name,
-              relationship: emergencyContacts.relationship,
-              phone_number: emergencyContacts.phone_number,
-              email: emergencyContacts.email,
-              home_address: emergencyContacts.home_address,
-              alternate_contact_name: emergencyContacts.alternate_contact_name,
-              alternate_contact_relationship: emergencyContacts.alternate_contact_relationship,
-              alternate_contact_number: emergencyContacts.alternate_contact_number,
-              communication_preference: emergencyContacts.communication_preference
-            });
-          }
-          break;
-
-        case 4:
-          if (editingStudent) {
-            // First get the existing fee record
-            const feesResponse = await api.get(`/students/${studentId}/fees`);
-            const feeId = feesResponse.data?.data?.[0]?.id;
-
-            if (feeId) {
-              // Update existing fee record
-              await api.put(`/students/${studentId}/fees/${feeId}`, {
-                fee_type: feeStructure.feeType,
-                academic_year: feeStructure.academicYear,
-                term: feeStructure.term,
-                amount: parseFloat(feeStructure.amount) || 0,
-                amount_paid: parseFloat(feeStructure.amountPaid) || 0,
-                balance: parseFloat(feeStructure.balance) || 0,
-                due_date: feeStructure.dueDate,
-                payment_status: feeStructure.paymentStatus,
-                payment_method: feeStructure.paymentMethod,
-                transaction_id: feeStructure.transactionId,
-                receipt_number: feeStructure.receiptNumber,
-                remarks: feeStructure.remarks,
-                payment_date: feeStructure.paymentDate,
-                collected_by: feeStructure.collectedBy,
-                is_cancelled: feeStructure.isCancelled,
-                cancellation_reason: feeStructure.cancellationReason
-              });
-            } else {
-              // Create new fee record if none exists
-              await api.post(`/students/${studentId}/fees`, {
-                fee_type: feeStructure.feeType,
-                academic_year: feeStructure.academicYear,
-                term: feeStructure.term,
-                amount: parseFloat(feeStructure.amount) || 0,
-                amount_paid: parseFloat(feeStructure.amountPaid) || 0,
-                balance: parseFloat(feeStructure.balance) || 0,
-                due_date: feeStructure.dueDate,
-                payment_status: feeStructure.paymentStatus,
-                payment_method: feeStructure.paymentMethod,
-                transaction_id: feeStructure.transactionId,
-                receipt_number: feeStructure.receiptNumber,
-                remarks: feeStructure.remarks,
-                payment_date: feeStructure.paymentDate,
-                collected_by: feeStructure.collectedBy,
-                is_cancelled: feeStructure.isCancelled,
-                cancellation_reason: feeStructure.cancellationReason
-              });
-            }
-          } else {
-            // Create new fee record for new student
-            await api.post(`/students/${studentId}/fees`, {
-              fee_type: feeStructure.feeType,
-              academic_year: feeStructure.academicYear,
-              term: feeStructure.term,
-              amount: parseFloat(feeStructure.amount) || 0,
-              amount_paid: parseFloat(feeStructure.amountPaid) || 0,
-              balance: parseFloat(feeStructure.balance) || 0,
-              due_date: feeStructure.dueDate,
-              payment_status: feeStructure.paymentStatus,
-              payment_method: feeStructure.paymentMethod,
-              transaction_id: feeStructure.transactionId,
-              receipt_number: feeStructure.receiptNumber,
-              remarks: feeStructure.remarks,
-              payment_date: feeStructure.paymentDate,
-              collected_by: feeStructure.collectedBy,
-              is_cancelled: feeStructure.isCancelled,
-              cancellation_reason: feeStructure.cancellationReason
-            });
-          }
-          break;
-      }
-
-      // Move to next step
-      setActiveStep((prevActiveStep) => prevActiveStep + 1);
-    } catch (error: any) {
-      console.error('Error in handleNext:', error);
-      setSnackbar({ 
-        open: true, 
-        message: 'Error saving data: ' + (error?.response?.data?.message || error?.message || 'Unknown error'), 
-        severity: 'error' 
-      });
     }
   };
 

@@ -227,7 +227,7 @@ const Dashboard: React.FC = () => {
       text: 'Students',
       icon: <StudentsIcon />,
       path: '/students',
-      roles: ['school_admin', 'teacher'],
+      roles: ['super_admin','school_admin', 'teacher'],
     },
     {
       text: 'Teachers',

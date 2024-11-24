@@ -31,6 +31,9 @@ export class Student {
   @Column({ default: 'active' })
   status: string;
 
+  @Column({ name: 'parent_email', type: 'varchar', length: 255, nullable: true })
+  parent_email: string;
+
   @ManyToOne(() => School, school => school.students, { nullable: false })
   @JoinColumn({ name: 'school_id' })
   school: School;

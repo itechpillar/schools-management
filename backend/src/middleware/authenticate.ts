@@ -1,18 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AppError } from '../utils/appError';
-
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        roles: string[];
-        schoolId?: string;
-      };
-    }
-  }
-}
+import { AuthUser } from '../types/express';
 
 export const authenticate = async (req: Request, _res: Response, next: NextFunction) => {
   try {
@@ -29,18 +18,14 @@ export const authenticate = async (req: Request, _res: Response, next: NextFunct
       const decoded = jwt.verify(
         token,
         process.env.JWT_SECRET || 'your-secret-key'
-      ) as {
-        id: string;
-        roles: string[];
-        schoolId?: string;
-      };
+      ) as AuthUser;
+
+      if (!decoded) {
+        return next(new AppError(401, 'Invalid token'));
+      }
 
       // Add user info to request
-      req.user = {
-        id: decoded.id,
-        roles: decoded.roles,
-        schoolId: decoded.schoolId
-      };
+      req.user = decoded;
 
       next();
     } catch (error) {

@@ -19,12 +19,18 @@ export class AuthController {
   ): Promise<void> {
     try {
       console.log('Registration request:', req.body);
-      const { firstName, lastName, email, password, role: selectedRole, schoolId } = req.body;
+      const { firstName, lastName, email, password, roles, schoolId } = req.body;
 
       // Check if user already exists
       const existingUser = await userRepository.findOne({ where: { email } });
       if (existingUser) {
         return next(new AppError(400, 'Email already registered'));
+      }
+
+      // Get the first role from the roles array
+      const selectedRole = roles[0];
+      if (!selectedRole) {
+        return next(new AppError(400, 'Role is required'));
       }
 
       // Find the appropriate role
@@ -89,7 +95,7 @@ export class AuthController {
             firstName: savedUser.firstName,
             lastName: savedUser.lastName,
             email: savedUser.email,
-            roles: [role],
+            roles: [role.name],
             schoolId: savedUser.schoolId
           },
         },
@@ -145,7 +151,7 @@ export class AuthController {
             firstName: user.firstName,
             lastName: user.lastName,
             email: user.email,
-            roles: user.roles,
+            roles: user.roles.map(role => role.name),
             schoolId: user.schoolId,
             school: user.school
           },

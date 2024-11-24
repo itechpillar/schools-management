@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import AuthService from '../services/auth.service';
 import { 
   Box, 
@@ -7,23 +7,36 @@ import {
   TextField, 
   Typography, 
   Container, 
-  Alert, 
-  Paper
+  Alert,
+  Paper,
 } from '@mui/material';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = AuthService.getCurrentUser();
     if (currentUser) {
       navigate('/dashboard');
     }
-  }, [navigate]);
+    
+    // Handle registration success state
+    const state = location.state as { message?: string; email?: string } | null;
+    if (state?.message) {
+      setSuccessMessage(state.message);
+      // Clear the message from location state
+      window.history.replaceState({}, document.title);
+    }
+    if (state?.email) {
+      setEmail(state.email);
+    }
+  }, [navigate, location]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +46,13 @@ const Login: React.FC = () => {
     try {
       const user = await AuthService.login({ email, password });
       if (user && user.roles.length > 0) {
-        navigate('/dashboard');
+        console.log('User roles:', user.roles);
+        // Redirect parents to parent dashboard, others to regular dashboard
+        if (user.roles.includes('parent')) {
+          navigate('/parent-dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         setError('Invalid user role');
       }
@@ -61,6 +80,11 @@ const Login: React.FC = () => {
           <Typography component="h2" variant="h6" align="center" gutterBottom>
             Sign In
           </Typography>
+          {successMessage && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {successMessage}
+            </Alert>
+          )}
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
@@ -101,6 +125,25 @@ const Login: React.FC = () => {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </Box>
+          {/* Temporarily comment out regular registration */}
+          {/* <Button
+            component={RouterLink}
+            to="/register"
+            variant="text"
+            fullWidth
+            sx={{ mt: 1 }}
+          >
+            Don't have an account? Register
+          </Button> */}
+          <Button
+            component={RouterLink}
+            to="/parent-register"
+            variant="text"
+            fullWidth
+            sx={{ mt: 1 }}
+          >
+            Parent Registration
+          </Button>
         </Paper>
       </Box>
     </Container>

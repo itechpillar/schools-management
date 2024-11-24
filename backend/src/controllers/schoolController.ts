@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import AppDataSource from '../config/database';
 import { School } from '../entities/School';
+import { AppError } from '../utils/appError';
 
 const schoolRepository = AppDataSource.getRepository(School);
 
@@ -8,6 +9,10 @@ export const createSchool = async (req: Request, res: Response) => {
   try {
     console.log('Creating school with data:', req.body);
     const { name, address, contactNumber, email } = req.body;
+
+    if (!name || !address || !contactNumber) {
+      throw new AppError(400, 'Missing required fields');
+    }
 
     const school = new School();
     school.name = name;
@@ -24,11 +29,17 @@ export const createSchool = async (req: Request, res: Response) => {
       data: savedSchool,
     });
   } catch (error) {
-    console.error('Error creating school:', error);
-    console.error('Error stack:', error.stack);
+    if (error instanceof Error) {
+      console.error('Error creating school:', error);
+      console.error('Error stack:', error.stack);
+      return res.status(error instanceof AppError ? error.statusCode : 500).json({
+        status: 'error',
+        message: error.message,
+      });
+    }
     return res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Error creating school',
+      message: 'An unexpected error occurred',
     });
   }
 };
@@ -45,11 +56,17 @@ export const getAllSchools = async (_req: Request, res: Response) => {
       data: schools,
     });
   } catch (error) {
-    console.error('Error fetching schools:', error);
-    console.error('Error stack:', error.stack);
+    if (error instanceof Error) {
+      console.error('Error fetching schools:', error);
+      console.error('Error stack:', error.stack);
+      return res.status(error instanceof AppError ? error.statusCode : 500).json({
+        status: 'error',
+        message: error.message,
+      });
+    }
     return res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Error fetching schools',
+      message: 'An unexpected error occurred',
     });
   }
 };
@@ -61,11 +78,7 @@ export const getSchoolById = async (req: Request, res: Response) => {
     const school = await schoolRepository.findOne({ where: { id } });
 
     if (!school) {
-      console.log('School not found:', id);
-      return res.status(404).json({
-        status: 'error',
-        message: 'School not found',
-      });
+      throw new AppError(404, 'School not found');
     }
 
     console.log('School fetched:', school);
@@ -74,11 +87,17 @@ export const getSchoolById = async (req: Request, res: Response) => {
       data: school,
     });
   } catch (error) {
-    console.error('Error fetching school:', error);
-    console.error('Error stack:', error.stack);
+    if (error instanceof Error) {
+      console.error('Error fetching school:', error);
+      console.error('Error stack:', error.stack);
+      return res.status(error instanceof AppError ? error.statusCode : 500).json({
+        status: 'error',
+        message: error.message,
+      });
+    }
     return res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Error fetching school',
+      message: 'An unexpected error occurred',
     });
   }
 };
@@ -92,32 +111,34 @@ export const updateSchool = async (req: Request, res: Response) => {
     const school = await schoolRepository.findOne({ where: { id } });
 
     if (!school) {
-      console.log('School not found:', id);
-      return res.status(404).json({
-        status: 'error',
-        message: 'School not found',
-      });
+      throw new AppError(404, 'School not found');
     }
 
-    school.name = name;
-    school.address = address;
-    school.contactNumber = contactNumber;
-    school.email = email;
+    if (name) school.name = name;
+    if (address) school.address = address;
+    if (contactNumber) school.contactNumber = contactNumber;
+    if (email) school.email = email;
 
     console.log('School object before save:', school);
-    await schoolRepository.save(school);
-    console.log('School updated successfully:', school);
+    const updatedSchool = await schoolRepository.save(school);
+    console.log('School updated successfully:', updatedSchool);
 
     return res.status(200).json({
       status: 'success',
-      data: school,
+      data: updatedSchool,
     });
   } catch (error) {
-    console.error('Error updating school:', error);
-    console.error('Error stack:', error.stack);
+    if (error instanceof Error) {
+      console.error('Error updating school:', error);
+      console.error('Error stack:', error.stack);
+      return res.status(error instanceof AppError ? error.statusCode : 500).json({
+        status: 'error',
+        message: error.message,
+      });
+    }
     return res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Error updating school',
+      message: 'An unexpected error occurred',
     });
   }
 };
@@ -129,11 +150,7 @@ export const deleteSchool = async (req: Request, res: Response) => {
     const school = await schoolRepository.findOne({ where: { id } });
 
     if (!school) {
-      console.log('School not found:', id);
-      return res.status(404).json({
-        status: 'error',
-        message: 'School not found',
-      });
+      throw new AppError(404, 'School not found');
     }
 
     console.log('School object before delete:', school);
@@ -145,11 +162,17 @@ export const deleteSchool = async (req: Request, res: Response) => {
       message: 'School deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting school:', error);
-    console.error('Error stack:', error.stack);
+    if (error instanceof Error) {
+      console.error('Error deleting school:', error);
+      console.error('Error stack:', error.stack);
+      return res.status(error instanceof AppError ? error.statusCode : 500).json({
+        status: 'error',
+        message: error.message,
+      });
+    }
     return res.status(500).json({
       status: 'error',
-      message: error instanceof Error ? error.message : 'Error deleting school',
+      message: 'An unexpected error occurred',
     });
   }
 };

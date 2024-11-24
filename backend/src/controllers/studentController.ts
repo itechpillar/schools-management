@@ -7,6 +7,7 @@ import { StudentMedical } from '../entities/StudentMedical';
 import { StudentEmergencyContact } from '../entities/StudentEmergencyContact';
 import { StudentFee } from '../entities/StudentFee';
 import { FeeType, PaymentMethod, PaymentStatus } from '../entities/enums';
+import { handleError } from '../utils/handleError';
 
 const studentRepository = AppDataSource.getRepository(Student);
 const schoolRepository = AppDataSource.getRepository(School);
@@ -23,7 +24,6 @@ export const createStudent = async (req: Request, res: Response) => {
       middleName,
       dateOfBirth,
       gender,
-      school_id,
       schoolId,
       grade,
       status,
@@ -33,7 +33,7 @@ export const createStudent = async (req: Request, res: Response) => {
     const userRole = req.user?.roles?.[0];
     const userSchoolId = req.user?.schoolId;
     
-    let actualSchoolId = school_id || schoolId;
+    let actualSchoolId = schoolId;
 
     // If school_admin, override with their school
     if (userRole === 'school_admin') {
@@ -99,19 +99,10 @@ export const createStudent = async (req: Request, res: Response) => {
         data: studentWithDetails,
       });
     } catch (error) {
-      console.error('Error saving student:', error);
-      return res.status(500).json({
-        status: 'error',
-        message: 'Failed to create student',
-        error: error.message
-      });
+      return handleError(error, res, 'Failed to create student');
     }
   } catch (error) {
-    console.error('Error in createStudent:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Error creating student',
-    });
+    return handleError(error, res, 'Failed to create student');
   }
 };
 
@@ -204,7 +195,6 @@ export const updateStudent = async (req: Request, res: Response) => {
       date_of_birth,
       dateOfBirth,
       gender,
-      school_id,
       schoolId,
       grade,
       status,
@@ -219,7 +209,7 @@ export const updateStudent = async (req: Request, res: Response) => {
     const actualFirstName = firstName || first_name;
     const actualLastName = lastName || last_name;
     const actualDateOfBirth = dateOfBirth || date_of_birth;
-    const actualSchoolId = school_id || schoolId;
+    const actualSchoolId = schoolId;
 
     // Validate required fields
     const missingFields = [];
@@ -370,7 +360,12 @@ export const updateStudent = async (req: Request, res: Response) => {
 export const deleteStudent = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const student = await studentRepository.findOne({ where: { id } });
+    
+    // Find student with all relations
+    const student = await studentRepository.findOne({
+      where: { id },
+      relations: ['academics', 'medicals', 'emergency_contacts', 'fees']
+    });
 
     if (!student) {
       return res.status(404).json({
@@ -379,14 +374,32 @@ export const deleteStudent = async (req: Request, res: Response) => {
       });
     }
 
+    // Delete related records first
+    if (student.academics?.length) {
+      await academicRepository.remove(student.academics);
+    }
+    
+    if (student.medicals?.length) {
+      await medicalRepository.remove(student.medicals);
+    }
+    
+    if (student.emergency_contacts?.length) {
+      await studentEmergencyContactRepository.remove(student.emergency_contacts);
+    }
+    
+    if (student.fees?.length) {
+      await feeRepository.remove(student.fees);
+    }
+
+    // Finally delete the student
     await studentRepository.remove(student);
 
     return res.status(200).json({
       status: 'success',
-      message: 'Student deleted successfully',
+      message: 'Student and all related records deleted successfully',
     });
   } catch (error) {
-    // console.error('Error deleting student:', error);
+    console.error('Error deleting student:', error);
     return res.status(500).json({
       status: 'error',
       message: error instanceof Error ? error.message : 'Error deleting student',
@@ -1005,12 +1018,7 @@ export const createStudentEmergencyContact = async (req: Request, res: Response)
       data: savedContact
     });
   } catch (error) {
-    console.error('Error creating student emergency contact:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: 'Error creating emergency contact',
-      error: error.message
-    });
+    return handleError(error, res, 'Error creating emergency contact');
   }
 };
 

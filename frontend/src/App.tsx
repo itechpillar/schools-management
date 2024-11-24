@@ -8,6 +8,8 @@ import Dashboard from './components/Dashboard';
 import Schools from './components/Schools';
 import Students from './components/Students';
 import UserManagement from './components/UserManagement';
+import ParentRegistration from './components/ParentRegistration';
+import ParentDashboard from './components/ParentDashboard';
 import AuthService, { User } from './services/auth.service';
 
 const theme = createTheme({
@@ -51,12 +53,22 @@ const App: React.FC = () => {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          {/* Temporarily comment out regular registration */}
+          {/* <Route path="/register" element={<Register />} /> */}
+          <Route path="/parent-register" element={<ParentRegistration />} />
           <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/parent-dashboard"
+            element={
+              <ProtectedRoute requiredRoles={['parent']}>
+                <ParentDashboard />
               </ProtectedRoute>
             }
           />
