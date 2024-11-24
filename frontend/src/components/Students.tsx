@@ -27,6 +27,7 @@ import {
   ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import api from '../services/api';
+import AuthService from '../services/auth.service';
 import StudentForm from './StudentForm';
 
 interface StudentResponse {
@@ -77,6 +78,8 @@ const Students: React.FC = () => {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
+  const currentUser = AuthService.getCurrentUser();
+  const isSchoolAdmin = currentUser?.roles.includes('school_admin');
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -90,7 +93,17 @@ const Students: React.FC = () => {
 
   const fetchStudents = async () => {
     try {
-      const response = await api.get('/students');
+      let response;
+      const userSchoolId = currentUser?.schoolId;
+      
+      if (isSchoolAdmin && userSchoolId) {
+        // Fetch only students from the school admin's school
+        response = await api.get(`/students?schoolId=${userSchoolId}`);
+      } else {
+        // Fetch all students for super_admin
+        response = await api.get('/students');
+      }
+      
       const studentsData: StudentResponse[] = Array.isArray(response.data.data) ? response.data.data : [];
       setStudents(studentsData.map((student: StudentResponse): Student => ({
         id: student.id,
@@ -111,6 +124,29 @@ const Students: React.FC = () => {
         severity: 'error',
       });
       setStudents([]);
+    }
+  };
+
+  const fetchSchools = async () => {
+    try {
+      const userSchoolId = currentUser?.schoolId;
+      
+      if (isSchoolAdmin && userSchoolId) {
+        // For school admin, only fetch their school
+        const response = await api.get(`/schools/${userSchoolId}`);
+        setSchools([response.data.data]);
+      } else {
+        // For super admin, fetch all schools
+        const response = await api.get('/schools');
+        setSchools(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching schools:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error fetching schools',
+        severity: 'error',
+      });
     }
   };
 
@@ -156,15 +192,6 @@ const Students: React.FC = () => {
     }
   };
 
-  const fetchSchools = async () => {
-    try {
-      const response = await api.get('/schools');
-      setSchools(response.data.data);
-    } catch (error) {
-      console.error('Error fetching schools:', error);
-    }
-  };
-
   const handleClickOpen = () => {
     setEditingStudent(null);
     setOpen(true);
@@ -177,7 +204,14 @@ const Students: React.FC = () => {
 
   const handleSave = async (formData: any) => {
     try {
-      fetchStudents();
+      setOpen(false);
+      setEditingStudent(null);
+      await fetchStudents();
+      setSnackbar({
+        open: true,
+        message: `Student ${editingStudent ? 'updated' : 'added'} successfully`,
+        severity: 'success',
+      });
     } catch (error) {
       console.error('Error saving student:', error);
       setSnackbar({

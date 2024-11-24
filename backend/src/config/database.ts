@@ -6,6 +6,7 @@ import { StudentEmergencyContact } from '../entities/StudentEmergencyContact';
 import { StudentFee } from '../entities/StudentFee';
 import { School } from '../entities/School';
 import { User } from '../entities/User';
+import { Role } from '../entities/Role';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -18,8 +19,8 @@ const AppDataSource = new DataSource({
     port: parseInt(process.env.DB_PORT || '5432'),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
-    database: isTest ? 'school_management_test' : (process.env.DB_NAME || 'school_management'),
-    entities: [Student, StudentAcademic, StudentMedical, StudentEmergencyContact, StudentFee, School, User],
+    database: isTest ? 'school_management_test' : (process.env.DB_DATABASE || 'school_management'),
+    entities: [Student, StudentAcademic, StudentMedical, StudentEmergencyContact, StudentFee, School, User, Role],
     migrations: [
         'src/migrations/*.ts'
     ],

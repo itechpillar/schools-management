@@ -7,6 +7,7 @@ import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import Schools from './components/Schools';
 import Students from './components/Students';
+import UserManagement from './components/UserManagement';
 import AuthService, { User } from './services/auth.service';
 
 const theme = createTheme({
@@ -35,7 +36,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" />;
   }
 
-  if (requiredRoles.length > 0 && !requiredRoles.includes(user.role)) {
+  // Check if user has any of the required roles
+  if (requiredRoles.length > 0 && !user.roles.some(role => requiredRoles.includes(role))) {
     return <Navigate to="/dashboard" />;
   }
 
@@ -67,9 +69,17 @@ const App: React.FC = () => {
             }
           />
           <Route
+            path="/users"
+            element={
+              <ProtectedRoute requiredRoles={['school_admin']}>
+                <UserManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/students"
             element={
-              <ProtectedRoute requiredRoles={['super_admin']}>
+              <ProtectedRoute requiredRoles={['super_admin', 'school_admin']}>
                 <Students />
               </ProtectedRoute>
             }

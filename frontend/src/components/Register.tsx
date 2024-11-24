@@ -8,20 +8,7 @@ import {
   Typography,
   Container,
   Alert,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
 } from '@mui/material';
-
-const roles = [
-  { value: 'super_admin', label: 'Super Admin' },
-  { value: 'school_admin', label: 'School Admin' },
-  { value: 'teacher', label: 'Teacher' },
-  { value: 'health_staff', label: 'Health Staff' },
-  { value: 'parent', label: 'Parent' },
-  { value: 'student', label: 'Student' },
-];
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -30,7 +17,7 @@ const Register: React.FC = () => {
     lastName: '',
     email: '',
     password: '',
-    role: '',
+    roles: [] as string[]
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,21 +30,18 @@ const Register: React.FC = () => {
     }));
   };
 
-  const handleRoleChange = (e: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      role: e.target.value,
-    }));
-  };
-
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      await AuthService.register(formData);
-      navigate('/dashboard');
+      // Register as super admin
+      await AuthService.register({
+        ...formData,
+        roles: ['super_admin']
+      });
+      navigate('/login');
     } catch (err: any) {
       setError(err.response?.data?.message || 'An error occurred during registration');
     } finally {
@@ -76,7 +60,10 @@ const Register: React.FC = () => {
         }}
       >
         <Typography component="h1" variant="h5">
-          Sign up
+          Create Super Admin Account
+        </Typography>
+        <Typography variant="body2" color="textSecondary" sx={{ mt: 1, mb: 2 }}>
+          This initial account will have full system access
         </Typography>
         <Box component="form" onSubmit={handleRegister} sx={{ mt: 1 }}>
           {error && (
@@ -123,21 +110,6 @@ const Register: React.FC = () => {
             value={formData.password}
             onChange={handleChange}
           />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Role</InputLabel>
-            <Select
-              value={formData.role}
-              label="Role"
-              onChange={handleRoleChange}
-              required
-            >
-              {roles.map((role) => (
-                <MenuItem key={role.value} value={role.value}>
-                  {role.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
           <Button
             type="submit"
             fullWidth
@@ -145,7 +117,7 @@ const Register: React.FC = () => {
             sx={{ mt: 3, mb: 2 }}
             disabled={loading}
           >
-            {loading ? 'Signing up...' : 'Sign Up'}
+            {loading ? 'Creating Account...' : 'Create Super Admin Account'}
           </Button>
           <Button
             fullWidth

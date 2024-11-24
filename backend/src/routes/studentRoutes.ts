@@ -24,19 +24,19 @@ import {
   deleteStudentMedical,
   getStudentFees,
 } from '../controllers/studentController';
-import { auth } from '../middleware/auth';
-import { UserRole } from '../entities/User';
+import { authenticate } from '../middleware/authenticate';
+import { authorize } from '../middleware/authorize';
 
 const router = express.Router();
 const studentRepository = AppDataSource.getRepository(Student);
 
 // Apply authentication middleware to all routes
-router.use(auth());
+router.use(authenticate);
 
-// Student CRUD operations (Super Admin only)
-router.post('/', auth([UserRole.SUPER_ADMIN]), createStudent);
-router.put('/:id', auth([UserRole.SUPER_ADMIN]), updateStudent);
-router.delete('/:id', auth([UserRole.SUPER_ADMIN]), deleteStudent);
+// Student CRUD operations
+router.post('/', authorize(['super_admin', 'school_admin']), createStudent);
+router.put('/:id', authorize(['super_admin', 'school_admin']), updateStudent);
+router.delete('/:id', authorize(['super_admin']), deleteStudent);
 
 // Student details (Read operations - accessible to all authenticated users)
 router.get('/', getAllStudents);
@@ -44,62 +44,51 @@ router.get('/:id', getStudentById);
 router.get('/:id/details', getStudentDetails);
 
 // Step-by-step form endpoints
-router.put('/:id/contact', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const contactData = req.body;
-    
-    const student = await studentRepository.findOne({ where: { id } });
-    if (!student) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Student not found',
-      });
+router.put(
+  '/:id/contact',
+  authorize(['super_admin', 'school_admin']),
+  async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const contactData = req.body;
+      
+      const student = await studentRepository.findOne({ where: { id } });
+      if (!student) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+
+      // Update contact information
+      Object.assign(student, contactData);
+      await studentRepository.save(student);
+
+      return res.status(200).json({ message: 'Contact information updated successfully', student });
+    } catch (error) {
+      return next(error);
     }
-
-    // Update contact information
-    Object.assign(student, contactData);
-    await studentRepository.save(student);
-
-    return res.status(200).json({
-      status: 'success',
-      data: student,
-    });
-  } catch (error) {
-    console.error('Error updating contact information:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: 'Error updating contact information',
-    });
   }
-});
+);
 
-router.put('/:id/academics', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentAcademic);
-router.put('/:id/medicals', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentMedical);
-router.put('/:id/emergency-contacts', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentEmergencyContact);
-router.put('/:id/fees', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentFee);
+// Academic routes
+router.get('/:id/academics', getStudentAcademics);
+router.post('/:id/academics', authorize(['super_admin', 'school_admin']), createStudentAcademic);
+router.put('/:id/academics/:academicId', authorize(['super_admin', 'school_admin']), updateStudentAcademic);
+router.delete('/:id/academics/:academicId', authorize(['super_admin']), deleteStudentAcademic);
 
-// Student emergency contact operations
-router.get('/:studentId/emergency-contacts', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), getStudentEmergencyContacts);
-router.post('/:studentId/emergency-contacts', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentEmergencyContact);
-router.put('/:studentId/emergency-contacts/:contactId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentEmergencyContact);
-router.delete('/:studentId/emergency-contacts/:contactId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), deleteStudentEmergencyContact);
+// Medical routes
+router.get('/:id/medicals', getStudentMedicals);
+router.post('/:id/medicals', authorize(['super_admin', 'school_admin']), createStudentMedical);
+router.put('/:id/medicals/:medicalId', authorize(['super_admin', 'school_admin']), updateStudentMedical);
+router.delete('/:id/medicals/:medicalId', authorize(['super_admin']), deleteStudentMedical);
 
-// Student fee operations
-router.get('/:id/fees', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), getStudentFees);
-router.post('/:id/fees', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentFee);
-router.put('/:id/fees/:feeId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateFeeStatus);
+// Emergency contact routes
+router.get('/:id/emergency-contacts', getStudentEmergencyContacts);
+router.post('/:id/emergency-contacts', authorize(['super_admin', 'school_admin']), createStudentEmergencyContact);
+router.put('/:id/emergency-contacts/:contactId', authorize(['super_admin', 'school_admin']), updateStudentEmergencyContact);
+router.delete('/:id/emergency-contacts/:contactId', authorize(['super_admin']), deleteStudentEmergencyContact);
 
-// Student academic operations
-router.get('/:studentId/academics', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), getStudentAcademics);
-router.post('/:studentId/academics', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentAcademic);
-router.put('/:studentId/academics/:academicId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentAcademic);
-router.delete('/:studentId/academics/:academicId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), deleteStudentAcademic);
-
-// Student medical operations
-router.get('/:studentId/medicals', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), getStudentMedicals);
-router.post('/:studentId/medicals', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentMedical);
-router.put('/:studentId/medicals/:medicalId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentMedical);
-router.delete('/:studentId/medicals/:medicalId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), deleteStudentMedical);
+// Fee routes
+router.get('/:id/fees', getStudentFees);
+router.post('/:id/fees', authorize(['super_admin', 'school_admin']), createStudentFee);
+router.put('/:id/fees/:feeId/status', authorize(['super_admin', 'school_admin']), updateFeeStatus);
 
 export default router;

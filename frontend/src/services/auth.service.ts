@@ -1,6 +1,7 @@
-import axios from 'axios';
+import axiosInstance from '../utils/axios.config';
+import API_URL from '../config/api.config';
 
-const API_URL = 'http://localhost:3001/api/auth/';
+const AUTH_URL = `${API_URL}/auth`;
 
 export interface LoginData {
   email: string;
@@ -10,7 +11,7 @@ export interface LoginData {
 export interface RegisterData extends LoginData {
   firstName: string;
   lastName: string;
-  role: string;
+  roles: string[];
 }
 
 export interface User {
@@ -18,8 +19,9 @@ export interface User {
   first_name: string;
   last_name: string;
   email: string;
-  role: string;
+  roles: string[];
   token: string;
+  schoolId?: string; // Add schoolId for school_admin users
 }
 
 interface AuthResponseData {
@@ -28,7 +30,7 @@ interface AuthResponseData {
     firstName: string;
     lastName: string;
     email: string;
-    role: string;
+    roles: { name: string }[];
   };
   token: string;
 }
@@ -41,45 +43,37 @@ export interface AuthResponse {
 class AuthService {
   async login(data: LoginData): Promise<User> {
     try {
-      const response = await axios.post<AuthResponse>(API_URL + 'login', data);
+      const response = await axiosInstance.post<AuthResponse>('/auth/login', data);
       if (response.data?.data?.user && response.data.data.token) {
         const userData: User = {
           userId: response.data.data.user.id,
           first_name: response.data.data.user.firstName,
           last_name: response.data.data.user.lastName,
           email: response.data.data.user.email,
-          role: response.data.data.user.role,
-          token: response.data.data.token
+          roles: response.data.data.user.roles.map(role => role.name),
+          token: response.data.data.token,
         };
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('token', response.data.data.token);
         return userData;
       }
-      throw new Error('Invalid response format');
-    } catch (error) {
-      throw error;
+      throw new Error('Invalid response from server');
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to login');
     }
   }
 
-  async register(data: RegisterData): Promise<User> {
+  async register(data: RegisterData): Promise<void> {
     try {
-      const response = await axios.post<AuthResponse>(API_URL + 'register', data);
-      if (response.data?.data?.user && response.data.data.token) {
-        const userData: User = {
-          userId: response.data.data.user.id,
-          first_name: response.data.data.user.firstName,
-          last_name: response.data.data.user.lastName,
-          email: response.data.data.user.email,
-          role: response.data.data.user.role,
-          token: response.data.data.token
-        };
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('token', response.data.data.token);
-        return userData;
-      }
-      throw new Error('Invalid response format');
-    } catch (error) {
-      throw error;
+      await axiosInstance.post('/auth/register', {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        password: data.password,
+        roles: data.roles,
+      });
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Failed to register');
     }
   }
 
@@ -115,9 +109,15 @@ class AuthService {
       typeof user.first_name === 'string' &&
       typeof user.last_name === 'string' &&
       typeof user.email === 'string' &&
-      typeof user.role === 'string' &&
-      typeof user.token === 'string'
+      Array.isArray(user.roles) &&
+      user.roles.every((role: string) => typeof role === 'string') &&
+      typeof user.token === 'string' &&
+      (user.schoolId === undefined || typeof user.schoolId === 'string')
     );
+  }
+
+  private handleError(error: any): void {
+    console.error('Error:', error);
   }
 }
 

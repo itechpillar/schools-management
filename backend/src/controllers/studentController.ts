@@ -29,19 +29,22 @@ export const createStudent = async (req: Request, res: Response) => {
       status,
     } = req.body;
 
-    console.log('Creating student with data:', {
-      firstName,
-      lastName,
-      middleName,
-      dateOfBirth,
-      gender,
-      school_id,
-      schoolId,
-      grade,
-      status,
-    });
+    // For school_admin, use their assigned school
+    const userRole = req.user?.roles?.[0];
+    const userSchoolId = req.user?.schoolId;
+    
+    let actualSchoolId = school_id || schoolId;
 
-    const actualSchoolId = school_id || schoolId;
+    // If school_admin, override with their school
+    if (userRole === 'school_admin') {
+      if (!userSchoolId) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'School admin must have an assigned school',
+        });
+      }
+      actualSchoolId = userSchoolId;
+    }
 
     // Verify that the school exists
     const school = await schoolRepository.findOne({ where: { id: actualSchoolId } });
@@ -70,16 +73,16 @@ export const createStudent = async (req: Request, res: Response) => {
       });
     }
 
-    // Create new student with school relationship
+    // Create new student
     const student = new Student();
     student.first_name = firstName.trim();
     student.middle_name = middleName?.trim() || null;
     student.last_name = lastName.trim();
     student.date_of_birth = new Date(dateOfBirth);
     student.gender = gender;
+    student.school = school;
     student.grade = grade.trim();
     student.status = status || 'active';
-    student.school = school;
 
     try {
       // Save the student with school relationship
@@ -413,10 +416,10 @@ export const getStudentDetails = async (req: Request, res: Response) => {
 
 export const getStudentAcademics = async (req: Request, res: Response) => {
   try {
-    const { studentId } = req.params;
+    const { id } = req.params;
 
     const academics = await academicRepository.find({
-      where: { student_id: studentId },
+      where: { student_id: id },
       order: { academic_year: 'DESC' }
     });
 
@@ -432,7 +435,7 @@ export const getStudentAcademics = async (req: Request, res: Response) => {
 
 export const createStudentAcademic = async (req: Request, res: Response) => {
   try {
-    const { studentId } = req.params;
+    const { id } = req.params;
     const {
       academic_year,
       grade,
@@ -446,7 +449,6 @@ export const createStudentAcademic = async (req: Request, res: Response) => {
       previous_school,
       admission_date,
       board,
-      status
     } = req.body;
 
     // Validate required fields
@@ -458,10 +460,7 @@ export const createStudentAcademic = async (req: Request, res: Response) => {
     }
 
     // Check if student exists
-    const student = await studentRepository.findOne({
-      where: { id: studentId }
-    });
-
+    const student = await studentRepository.findOne({ where: { id } });
     if (!student) {
       return res.status(404).json({
         status: 'error',
@@ -469,55 +468,37 @@ export const createStudentAcademic = async (req: Request, res: Response) => {
       });
     }
 
-    // Check if academic record for this year already exists
-    const existingRecord = await academicRepository.findOne({
-      where: {
-        student_id: studentId,
-        academic_year: academic_year
-      }
-    });
-
-    if (existingRecord) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Academic record already exists for this academic year'
-      });
-    }
-
-    // Create new academic record
-    const academic = academicRepository.create({
-      student: { id: studentId }, // Use proper relation
+    const academicData = academicRepository.create({
+      student_id: id,
       academic_year,
       grade,
       section,
-      roll_number: roll_number || null,
-      subjects: subjects || null,
-      attendance_percentage: attendance_percentage || null,
-      exam_scores: exam_scores || null,
-      extracurricular_activities: extracurricular_activities || null,
-      class_teacher_remarks: class_teacher_remarks || null,
-      previous_school: previous_school || null,
-      admission_date: admission_date ? new Date(admission_date) : null,
-      board: board || null,
-      status: status || 'active'
+      roll_number,
+      subjects,
+      attendance_percentage,
+      exam_scores,
+      extracurricular_activities,
+      class_teacher_remarks,
+      previous_school,
+      admission_date,
+      board,
     });
 
-    // Save the academic record
-    await academicRepository.save(academic);
+    await academicRepository.save(academicData);
 
     return res.status(201).json({
       status: 'success',
-      data: academic
+      data: academicData
     });
   } catch (error) {
-    // console.error('Error creating student academic record:', error);
+    console.error('Error creating student academic:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 export const updateStudentAcademic = async (req: Request, res: Response) => {
   try {
-    const { studentId, academicId } = req.params;
+    const { id, academicId } = req.params;
     const {
       academic_year,
       grade,
@@ -531,15 +512,20 @@ export const updateStudentAcademic = async (req: Request, res: Response) => {
       previous_school,
       admission_date,
       board,
-      status
     } = req.body;
 
-    // Find the academic record
+    // Check if student exists
+    const student = await studentRepository.findOne({ where: { id } });
+    if (!student) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Student not found'
+      });
+    }
+
+    // Check if academic record exists
     const academic = await academicRepository.findOne({
-      where: {
-        id: academicId,
-        student_id: studentId
-      }
+      where: { id: academicId, student_id: id }
     });
 
     if (!academic) {
@@ -549,22 +535,22 @@ export const updateStudentAcademic = async (req: Request, res: Response) => {
       });
     }
 
-    // Update fields if provided
-    academic.academic_year = academic_year || academic.academic_year;
-    academic.grade = grade || academic.grade;
-    academic.section = section || academic.section;
-    academic.roll_number = roll_number !== undefined ? roll_number : academic.roll_number;
-    academic.subjects = subjects !== undefined ? subjects : academic.subjects;
-    academic.attendance_percentage = attendance_percentage !== undefined ? attendance_percentage : academic.attendance_percentage;
-    academic.exam_scores = exam_scores !== undefined ? exam_scores : academic.exam_scores;
-    academic.extracurricular_activities = extracurricular_activities !== undefined ? extracurricular_activities : academic.extracurricular_activities;
-    academic.class_teacher_remarks = class_teacher_remarks !== undefined ? class_teacher_remarks : academic.class_teacher_remarks;
-    academic.previous_school = previous_school !== undefined ? previous_school : academic.previous_school;
-    academic.admission_date = admission_date ? new Date(admission_date) : null;
-    academic.board = board !== undefined ? board : academic.board;
-    academic.status = status || academic.status;
+    // Update academic record
+    Object.assign(academic, {
+      academic_year,
+      grade,
+      section,
+      roll_number,
+      subjects,
+      attendance_percentage,
+      exam_scores,
+      extracurricular_activities,
+      class_teacher_remarks,
+      previous_school,
+      admission_date,
+      board,
+    });
 
-    // Save the updated academic record
     await academicRepository.save(academic);
 
     return res.status(200).json({
@@ -572,21 +558,27 @@ export const updateStudentAcademic = async (req: Request, res: Response) => {
       data: academic
     });
   } catch (error) {
-    // console.error('Error updating student academic record:', error);
+    console.error('Error updating student academic:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 export const deleteStudentAcademic = async (req: Request, res: Response) => {
   try {
-    const { studentId, academicId } = req.params;
+    const { id, academicId } = req.params;
 
-    // Find the academic record
+    // Check if student exists
+    const student = await studentRepository.findOne({ where: { id } });
+    if (!student) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Student not found'
+      });
+    }
+
+    // Check if academic record exists
     const academic = await academicRepository.findOne({
-      where: {
-        id: academicId,
-        student_id: studentId
-      }
+      where: { id: academicId, student_id: id }
     });
 
     if (!academic) {
@@ -596,7 +588,6 @@ export const deleteStudentAcademic = async (req: Request, res: Response) => {
       });
     }
 
-    // Delete the academic record
     await academicRepository.remove(academic);
 
     return res.status(200).json({
@@ -604,17 +595,17 @@ export const deleteStudentAcademic = async (req: Request, res: Response) => {
       message: 'Academic record deleted successfully'
     });
   } catch (error) {
-    // console.error('Error deleting student academic record:', error);
+    console.error('Error deleting student academic:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 export const getStudentMedicals = async (req: Request, res: Response) => {
   try {
-    const { studentId } = req.params;
+    const { id } = req.params;
 
     const medicals = await medicalRepository.find({
-      where: { student_id: studentId },
+      where: { student_id: id },
       order: { created_at: 'DESC' }
     });
 
@@ -623,14 +614,14 @@ export const getStudentMedicals = async (req: Request, res: Response) => {
       data: medicals
     });
   } catch (error) {
-    // console.error('Error fetching student medical records:', error);
+    console.error('Error fetching student medical records:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
 export const createStudentMedical = async (req: Request, res: Response) => {
   try {
-    const { studentId } = req.params;
+    const { id } = req.params;
     const {
       blood_group,
       medical_conditions,
@@ -653,7 +644,7 @@ export const createStudentMedical = async (req: Request, res: Response) => {
 
     // Check if student exists
     const student = await studentRepository.findOne({
-      where: { id: studentId }
+      where: { id }
     });
 
     if (!student) {
@@ -666,7 +657,7 @@ export const createStudentMedical = async (req: Request, res: Response) => {
     // Create new medical record
     const medical = new StudentMedical();
     medical.student = student;
-    medical.student_id = studentId;
+    medical.student_id = id;
     medical.blood_group = blood_group || null;
     medical.medical_conditions = medical_conditions || null;
     medical.allergies = allergies || null;
@@ -700,7 +691,7 @@ export const createStudentMedical = async (req: Request, res: Response) => {
 
 export const updateStudentMedical = async (req: Request, res: Response) => {
   try {
-    const { studentId, medicalId } = req.params;
+    const { id, medicalId } = req.params;
     const {
       blood_group,
       medical_conditions,
@@ -725,7 +716,7 @@ export const updateStudentMedical = async (req: Request, res: Response) => {
     const medical = await medicalRepository.findOne({
       where: {
         id: medicalId,
-        student_id: studentId
+        student_id: id
       }
     });
 
@@ -770,13 +761,13 @@ export const updateStudentMedical = async (req: Request, res: Response) => {
 
 export const deleteStudentMedical = async (req: Request, res: Response) => {
   try {
-    const { studentId, medicalId } = req.params;
+    const { id, medicalId } = req.params;
 
     // Find the medical record
     const medical = await medicalRepository.findOne({
       where: {
         id: medicalId,
-        student_id: studentId
+        student_id: id
       }
     });
 
@@ -948,8 +939,8 @@ export const getStudentEmergencyContacts = async (req: Request, res: Response) =
 export const createStudentEmergencyContact = async (req: Request, res: Response) => {
   try {
     console.log('Starting emergency contact creation...');
-    const { studentId } = req.params;
-    console.log('Student ID from params:', studentId);
+    const { id } = req.params;
+    console.log('Student ID from params:', id);
     const {
       contact_name,
       relationship,
@@ -973,13 +964,13 @@ export const createStudentEmergencyContact = async (req: Request, res: Response)
     }
 
     // Find the student
-    console.log('Finding student with ID:', studentId);
+    console.log('Finding student with ID:', id);
     const student = await studentRepository.findOne({
-      where: { id: studentId }
+      where: { id }
     });
 
     if (!student) {
-      console.log('Student not found with ID:', studentId);
+      console.log('Student not found with ID:', id);
       return res.status(404).json({
         status: 'error',
         message: 'Student not found'
@@ -991,7 +982,7 @@ export const createStudentEmergencyContact = async (req: Request, res: Response)
     console.log('Creating new emergency contact...');
     const emergencyContact = new StudentEmergencyContact();
     emergencyContact.student = student;
-    emergencyContact.student_id = studentId;
+    emergencyContact.student_id = id;
     emergencyContact.contact_name = contact_name;
     emergencyContact.relationship = relationship;
     emergencyContact.phone_number = phone_number;
@@ -1025,13 +1016,13 @@ export const createStudentEmergencyContact = async (req: Request, res: Response)
 
 export const deleteStudentEmergencyContact = async (req: Request, res: Response) => {
   try {
-    const { studentId, contactId } = req.params;
+    const { id, contactId } = req.params;
 
     // Find the emergency contact
     const emergencyContact = await studentEmergencyContactRepository.findOne({
       where: {
         contact_id: contactId,
-        student_id: studentId
+        student_id: id
       }
     });
 

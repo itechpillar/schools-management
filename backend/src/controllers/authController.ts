@@ -1,9 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { User, UserRole } from '../entities/User';
+import { User } from '../entities/User';
 import { AppError } from '../utils/appError';
 import AppDataSource from '../config/database';
 import * as bcrypt from 'bcrypt';
+import { Role } from '../entities/Role';
+import { School } from '../entities/School';
+
+const userRepository = AppDataSource.getRepository(User);
+const roleRepository = AppDataSource.getRepository(Role);
+const schoolRepository = AppDataSource.getRepository(School);
 
 export class AuthController {
   static async register(
@@ -13,23 +19,30 @@ export class AuthController {
   ): Promise<void> {
     try {
       console.log('Registration request:', req.body);
-      const userRepository = AppDataSource.getRepository(User);
-      const { firstName, lastName, email, password, role } = req.body;
-
-      // Validate role
-      if (!Object.values(UserRole).includes(role)) {
-        return next(new AppError(400, 'Invalid role specified'));
-      }
-
-      // Validate required fields
-      if (!firstName || !lastName || !email || !password || !role) {
-        return next(new AppError(400, 'All fields are required'));
-      }
+      const { firstName, lastName, email, password, role: selectedRole, schoolId } = req.body;
 
       // Check if user already exists
       const existingUser = await userRepository.findOne({ where: { email } });
       if (existingUser) {
         return next(new AppError(400, 'Email already registered'));
+      }
+
+      // Find the appropriate role
+      const role = await roleRepository.findOne({ 
+        where: { name: selectedRole.toLowerCase() }
+      });
+
+      if (!role) {
+        return next(new AppError(400, 'Invalid role selected'));
+      }
+
+      // If not super_admin, verify school exists
+      let school = null;
+      if (selectedRole !== 'super_admin' && schoolId) {
+        school = await schoolRepository.findOne({ where: { id: schoolId } });
+        if (!school) {
+          return next(new AppError(400, 'Invalid school selected'));
+        }
       }
 
       // Hash password
@@ -41,8 +54,15 @@ export class AuthController {
       user.firstName = firstName;
       user.lastName = lastName;
       user.email = email;
+      user.username = email; // Set username to email by default
       user.password = hashedPassword;
-      user.role = role;
+      user.roles = [role];
+      
+      // Set school if provided and role is not super_admin
+      if (school) {
+        user.schoolId = school.id;
+        user.school = school;
+      }
 
       console.log('Saving user:', { ...user, password: '[REDACTED]' });
       const savedUser = await userRepository.save(user);
@@ -50,11 +70,14 @@ export class AuthController {
 
       // Generate JWT token
       const token = jwt.sign(
-        { id: savedUser.id, role: savedUser.role },
+        { 
+          id: savedUser.id,
+          email: savedUser.email,
+          roles: [role.name],
+          schoolId: savedUser.schoolId
+        },
         process.env.JWT_SECRET || 'your-secret-key',
-        {
-          expiresIn: process.env.JWT_EXPIRES_IN || '1d',
-        }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
       );
 
       res.status(201).json({
@@ -66,7 +89,8 @@ export class AuthController {
             firstName: savedUser.firstName,
             lastName: savedUser.lastName,
             email: savedUser.email,
-            role: savedUser.role,
+            roles: [role],
+            schoolId: savedUser.schoolId
           },
         },
       });
@@ -82,43 +106,34 @@ export class AuthController {
     next: NextFunction
   ): Promise<void> {
     try {
-      console.log('Login request:', { ...req.body, password: '[REDACTED]' });
-      const userRepository = AppDataSource.getRepository(User);
       const { email, password } = req.body;
 
-      if (!email || !password) {
-        return next(new AppError(400, 'Email and password are required'));
-      }
+      // Find user with roles and school
+      const user = await userRepository.findOne({
+        where: { email },
+        relations: ['roles', 'school']
+      });
 
-      // Find user by email
-      console.log('Finding user by email:', email);
-      const user = await userRepository.findOne({ where: { email } });
       if (!user) {
-        console.log('User not found:', email);
         return next(new AppError(401, 'Invalid email or password'));
       }
 
-      // Check password
-      //let t = await bcrypt.hash(password, 10);
-      console.log('Checking password for user:', email);
-      console.log('Stored hashed password:', user.password);
-      console.log(`Attempting to compare with provided password ${password}`);
-      console.log(`Provided password: ${password}`);
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      console.log('Password comparison result:', isPasswordValid);
-
+      // Verify password
+      const isPasswordValid = await user.comparePassword(password);
       if (!isPasswordValid) {
-        console.log('Invalid password for user:', email);
         return next(new AppError(401, 'Invalid email or password'));
       }
 
-      // Generate token
+      // Generate token with roles and school
       const token = jwt.sign(
-        { id: user.id, role: user.role },
+        { 
+          id: user.id,
+          email: user.email,
+          roles: user.roles.map(role => role.name),
+          schoolId: user.schoolId
+        },
         process.env.JWT_SECRET || 'your-secret-key',
-        {
-          expiresIn: process.env.JWT_EXPIRES_IN || '1d',
-        }
+        { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
       );
 
       res.status(200).json({
@@ -130,13 +145,15 @@ export class AuthController {
             firstName: user.firstName,
             lastName: user.lastName,
             email: user.email,
-            role: user.role,
+            roles: user.roles,
+            schoolId: user.schoolId,
+            school: user.school
           },
         },
       });
     } catch (err) {
       console.error('Login error:', err);
-      next(new AppError(500, 'Error during login: ' + (err as Error).message));
+      return next(new AppError(500, 'Internal server error'));
     }
   }
 }

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { UserRole } from '../../models/User';
-import { auth } from '../auth';
+import { auth } from '../authenticate';
 
 describe('Auth Middleware', () => {
   let mockRequest: Partial<Request>;

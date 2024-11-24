@@ -4,6 +4,8 @@ import authRoutes from './routes/auth.routes';
 import schoolRoutes from './routes/schoolRoutes';
 import studentRoutes from './routes/studentRoutes';
 import { errorHandler } from './middleware/errorHandler';
+import userRoutes from './routes/userRoutes';
+
 
 const app = express();
 
@@ -15,6 +17,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/schools', schoolRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/users', userRoutes);
 
 // Error handling
 app.use(errorHandler);

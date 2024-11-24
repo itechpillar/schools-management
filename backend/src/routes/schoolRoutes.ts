@@ -6,18 +6,18 @@ import {
   updateSchool,
   deleteSchool,
 } from '../controllers/schoolController';
-import { auth } from '../middleware/auth';
-import { UserRole } from '../entities/User';
+import { authenticate } from '../middleware/authenticate';
+import { authorize } from '../middleware/authorize';
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(auth());
+router.use(authenticate);
 
 // Routes that require super admin
-router.post('/', auth([UserRole.SUPER_ADMIN]), createSchool);
-router.put('/:id', auth([UserRole.SUPER_ADMIN]), updateSchool);
-router.delete('/:id', auth([UserRole.SUPER_ADMIN]), deleteSchool);
+router.post('/', authorize(['super_admin']), createSchool);
+router.put('/:id', authorize(['super_admin']), updateSchool);
+router.delete('/:id', authorize(['super_admin']), deleteSchool);
 
 // Routes accessible to all authenticated users
 router.get('/', getAllSchools);
