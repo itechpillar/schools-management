@@ -1,6 +1,7 @@
-import express from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import AppDataSource from '../config/database';
 import { Student } from '../entities/Student';
+import { AuthUser } from '../types/express';
 import {
   createStudent,
   getAllStudents,
@@ -24,19 +25,72 @@ import {
   deleteStudentMedical,
   getStudentFees,
 } from '../controllers/studentController';
-import { auth } from '../middleware/auth';
-import { UserRole } from '../entities/User';
+import { authenticate } from '../middleware/authenticate';
+import { authorize } from '../middleware/authorize';
 
-const router = express.Router();
+const router = Router();
 const studentRepository = AppDataSource.getRepository(Student);
 
-// Apply authentication middleware to all routes
-router.use(auth());
+// Public routes
+router.get('/parent-email-check', async (req: Request, res: Response) => {
+  try {
+    const email = req.query.email as string;
 
-// Student CRUD operations (Super Admin only)
-router.post('/', auth([UserRole.SUPER_ADMIN]), createStudent);
-router.put('/:id', auth([UserRole.SUPER_ADMIN]), updateStudent);
-router.delete('/:id', auth([UserRole.SUPER_ADMIN]), deleteStudent);
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const students = await studentRepository.find({
+      where: {
+        parent_email: email
+      }
+    });
+    
+    return res.status(200).json({ exists: students.length > 0 });
+  } catch (error) {
+    console.error('Error checking parent email:', error);
+    return res.status(500).json({ message: 'Error checking parent email' });
+  }
+});
+
+// Apply authentication middleware to all routes below this line
+router.use(authenticate);
+
+// Student CRUD operations
+router.post('/', authorize(['super_admin', 'school_admin']), createStudent);
+router.put('/:id', authorize(['super_admin', 'school_admin']), updateStudent);
+router.delete('/:id', authorize(['super_admin', 'school_admin']), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user as AuthUser;
+    const { id } = req.params;
+
+    // Find the student with their school information
+    const student = await studentRepository.findOne({
+      where: { id },
+      relations: ['school']
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Student not found'
+      });
+    }
+
+    // If school_admin, verify they belong to the same school
+    if (user.roles.includes('school_admin') && user.schoolId !== student.school.id) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'You can only delete students from your own school'
+      });
+    }
+
+    // Proceed with deletion
+    return deleteStudent(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Student details (Read operations - accessible to all authenticated users)
 router.get('/', getAllStudents);
@@ -44,62 +98,76 @@ router.get('/:id', getStudentById);
 router.get('/:id/details', getStudentDetails);
 
 // Step-by-step form endpoints
-router.put('/:id/contact', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), async (req, res) => {
+router.put(
+  '/:id/contact',
+  authorize(['super_admin', 'school_admin']),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const contactData = req.body;
+      
+      const student = await studentRepository.findOne({ where: { id } });
+      if (!student) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+
+      // Update contact information
+      Object.assign(student, contactData);
+      await studentRepository.save(student);
+
+      return res.status(200).json({ message: 'Contact information updated successfully', student });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+// Academic routes
+router.get('/:id/academics', getStudentAcademics);
+router.post('/:id/academics', authorize(['super_admin', 'school_admin']), createStudentAcademic);
+router.put('/:id/academics/:academicId', authorize(['super_admin', 'school_admin']), updateStudentAcademic);
+router.delete('/:id/academics/:academicId', authorize(['super_admin']), deleteStudentAcademic);
+
+// Medical routes
+router.get('/:id/medicals', getStudentMedicals);
+router.post('/:id/medicals', authorize(['super_admin', 'school_admin']), createStudentMedical);
+router.put('/:id/medicals/:medicalId', authorize(['super_admin', 'school_admin']), updateStudentMedical);
+router.delete('/:id/medicals/:medicalId', authorize(['super_admin']), deleteStudentMedical);
+
+// Emergency contact routes
+router.get('/:id/emergency-contacts', getStudentEmergencyContacts);
+router.post('/:id/emergency-contacts', authorize(['super_admin', 'school_admin']), createStudentEmergencyContact);
+router.put('/:id/emergency-contacts/:contactId', authorize(['super_admin', 'school_admin']), updateStudentEmergencyContact);
+router.delete('/:id/emergency-contacts/:contactId', authorize(['super_admin']), deleteStudentEmergencyContact);
+
+// Fee routes
+router.get('/:id/fees', getStudentFees);
+router.post('/:id/fees', authorize(['super_admin', 'school_admin']), createStudentFee);
+router.put('/:id/fees/:feeId/status', authorize(['super_admin', 'school_admin']), updateFeeStatus);
+
+// Parent functionality endpoints
+router.get('/parent', authenticate, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const contactData = req.body;
-    
-    const student = await studentRepository.findOne({ where: { id } });
-    if (!student) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Student not found',
-      });
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
     }
 
-    // Update contact information
-    Object.assign(student, contactData);
-    await studentRepository.save(student);
+    if (!req.user.roles.includes('parent')) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
 
-    return res.status(200).json({
-      status: 'success',
-      data: student,
+    const students = await studentRepository.find({
+      where: {
+        parent_email: req.user.email
+      },
+      relations: ['academics', 'medicals']
     });
+
+    return res.status(200).json({ data: students });
   } catch (error) {
-    console.error('Error updating contact information:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: 'Error updating contact information',
-    });
+    console.error('Error fetching students:', error);
+    return res.status(500).json({ message: 'Error fetching students' });
   }
 });
-
-router.put('/:id/academics', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentAcademic);
-router.put('/:id/medicals', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentMedical);
-router.put('/:id/emergency-contacts', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentEmergencyContact);
-router.put('/:id/fees', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentFee);
-
-// Student emergency contact operations
-router.get('/:studentId/emergency-contacts', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), getStudentEmergencyContacts);
-router.post('/:studentId/emergency-contacts', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentEmergencyContact);
-router.put('/:studentId/emergency-contacts/:contactId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentEmergencyContact);
-router.delete('/:studentId/emergency-contacts/:contactId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), deleteStudentEmergencyContact);
-
-// Student fee operations
-router.get('/:id/fees', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), getStudentFees);
-router.post('/:id/fees', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentFee);
-router.put('/:id/fees/:feeId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateFeeStatus);
-
-// Student academic operations
-router.get('/:studentId/academics', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), getStudentAcademics);
-router.post('/:studentId/academics', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentAcademic);
-router.put('/:studentId/academics/:academicId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentAcademic);
-router.delete('/:studentId/academics/:academicId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), deleteStudentAcademic);
-
-// Student medical operations
-router.get('/:studentId/medicals', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), getStudentMedicals);
-router.post('/:studentId/medicals', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), createStudentMedical);
-router.put('/:studentId/medicals/:medicalId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), updateStudentMedical);
-router.delete('/:studentId/medicals/:medicalId', auth([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), deleteStudentMedical);
 
 export default router;

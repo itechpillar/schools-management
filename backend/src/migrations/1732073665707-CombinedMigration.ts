@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CombinedMigration1732073665707 implements MigrationInterface {
+export class CombinedMigration1732073665708 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         // Drop existing tables if they exist
         await queryRunner.query(`DROP TABLE IF EXISTS student_fees CASCADE`);
@@ -9,6 +9,9 @@ export class CombinedMigration1732073665707 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE IF EXISTS student_academics CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS students CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS schools CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS user_roles CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS roles CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS users CASCADE`);
 
         // Create schools table
         await queryRunner.query(`
@@ -143,6 +146,55 @@ export class CombinedMigration1732073665707 implements MigrationInterface {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        // Create roles table
+        await queryRunner.query(`
+            CREATE TABLE roles (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(50) NOT NULL UNIQUE,
+                description TEXT,
+                permissions JSONB,
+                status VARCHAR(50) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Create users table
+        await queryRunner.query(`
+            CREATE TABLE users (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                username VARCHAR(255) NOT NULL UNIQUE,
+                email VARCHAR(255) NOT NULL UNIQUE,
+                password VARCHAR(255) NOT NULL,
+                first_name VARCHAR(255),
+                last_name VARCHAR(255),
+                school_id UUID REFERENCES schools(id),
+                status VARCHAR(50) DEFAULT 'active',
+                last_login TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Create user_roles junction table
+        await queryRunner.query(`
+            CREATE TABLE user_roles (
+                user_id UUID REFERENCES users(id),
+                role_id UUID REFERENCES roles(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, role_id)
+            )
+        `);
+
+        // Insert default roles
+        await queryRunner.query(`
+            INSERT INTO roles (name, description, permissions) VALUES
+            ('super_admin', 'Super Administrator with full system access', '{"all": true}'::jsonb),
+            ('school_admin', 'School Administrator with full school access', '{"school": true, "users": true, "students": true}'::jsonb),
+            ('teacher', 'Teacher with limited access', '{"students": {"view": true, "edit": true}}'::jsonb),
+            ('staff', 'Staff member with basic access', '{"students": {"view": true}}'::jsonb)
+        `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
@@ -153,5 +205,8 @@ export class CombinedMigration1732073665707 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE IF EXISTS student_academics CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS students CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS schools CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS user_roles CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS roles CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS users CASCADE`);
     }
 }

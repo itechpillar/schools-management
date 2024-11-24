@@ -27,6 +27,8 @@ import {
   TablePagination,
   TableSortLabel,
   InputAdornment,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -34,8 +36,11 @@ import {
   Delete as DeleteIcon,
   ArrowBack as ArrowBackIcon,
   Search as SearchIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
+import axiosInstance from '../utils/axios.config';
+
+import API_URL from '../config/api.config';
 
 interface School {
   id: string;
@@ -45,11 +50,31 @@ interface School {
   email: string;
 }
 
+interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  roles: string[];
+}
+
 interface FormData {
   name: string;
   address: string;
   contactNumber: string;
   email: string;
+  includeAdmin?: boolean;
+  adminFirstName?: string;
+  adminLastName?: string;
+  adminEmail?: string;
+  adminPassword?: string;
+}
+
+interface AdminFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
 }
 
 interface ApiResponse<T> {
@@ -65,12 +90,20 @@ const Schools: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [formData, setFormData] = useState<FormData>({
     name: '',
     address: '',
     contactNumber: '',
     email: '',
+  });
+  const [adminFormData, setAdminFormData] = useState<AdminFormData>({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
   });
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -80,11 +113,11 @@ const Schools: React.FC = () => {
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Sorting state
   const [order, setOrder] = useState<Order>('asc');
   const [orderBy, setOrderBy] = useState<OrderBy>('name');
-  
+
   // Pagination state
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -92,7 +125,7 @@ const Schools: React.FC = () => {
   const user = AuthService.getCurrentUser();
 
   useEffect(() => {
-    if (!user || user.role !== 'super_admin') {
+    if (!user || !user.roles.includes('super_admin')) {
       navigate('/dashboard');
       return;
     }
@@ -102,79 +135,37 @@ const Schools: React.FC = () => {
   const fetchSchools = async () => {
     try {
       setLoading(true);
-      const response = await axios.get<ApiResponse<School[]>>('http://localhost:3001/api/schools', {
-        headers: { Authorization: `Bearer ${user?.token}` },
-      });
-      setSchools(response.data.data || []);
+      const response = await axiosInstance.get<ApiResponse<School[]>>('/schools');
+      setSchools(response.data.data);
     } catch (error) {
-      console.error('Error fetching schools:', error);
       setSnackbar({
         open: true,
-        message: 'Error fetching schools',
+        message: 'Failed to fetch schools',
         severity: 'error',
       });
-      setSchools([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Sorting function
-  const handleRequestSort = (property: OrderBy) => {
-    const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
-  };
-
-  // Sorting logic
-  const sortedSchools = [...schools].sort((a, b) => {
-    if (order === 'asc') {
-      return a[orderBy] > b[orderBy] ? 1 : -1;
+  const handleOpen = (school?: School) => {
+    if (school) {
+      setEditingSchool(school);
+      setFormData({
+        name: school.name,
+        address: school.address,
+        contactNumber: school.contactNumber,
+        email: school.email,
+      });
     } else {
-      return b[orderBy] > a[orderBy] ? 1 : -1;
+      setEditingSchool(null);
+      setFormData({
+        name: '',
+        address: '',
+        contactNumber: '',
+        email: '',
+      });
     }
-  });
-
-  // Search logic
-  const filteredSchools = sortedSchools.filter((school) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      school.name.toLowerCase().includes(searchLower) ||
-      school.address.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Pagination logic
-  const paginatedSchools = filteredSchools.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleEdit = (school: School) => {
-    setEditingSchool(school);
-    setFormData({
-      name: school.name,
-      address: school.address,
-      contactNumber: school.contactNumber,
-      email: school.email,
-    });
     setOpen(true);
   };
 
@@ -186,48 +177,88 @@ const Schools: React.FC = () => {
       address: '',
       contactNumber: '',
       email: '',
+      adminFirstName: '',
+      adminLastName: '',
+      adminEmail: '',
+      adminPassword: '',
+      includeAdmin: false,
     });
   };
 
-  const handleSubmit = async () => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
+      setLoading(true);
       if (editingSchool) {
-        await axios.put(
-          `http://localhost:3001/api/schools/${editingSchool.id}`,
-          formData,
-          {
-            headers: { Authorization: `Bearer ${user?.token}` },
-          }
-        );
-      } else {
-        await axios.post('http://localhost:3001/api/schools', formData, {
-          headers: { Authorization: `Bearer ${user?.token}` },
+        await axiosInstance.put(`/schools/${editingSchool.id}`, {
+          name: formData.name,
+          address: formData.address,
+          contactNumber: formData.contactNumber,
+          email: formData.email,
         });
+        setSnackbar({
+          open: true,
+          message: 'School updated successfully',
+          severity: 'success',
+        });
+      } else {
+        // Create school first
+        const schoolResponse = await axiosInstance.post<ApiResponse<School>>('/schools', {
+          name: formData.name,
+          address: formData.address,
+          contactNumber: formData.contactNumber,
+          email: formData.email,
+        });
+
+        // If admin details are included, create admin user
+        if (formData.includeAdmin) {
+          await axiosInstance.post('/users', {
+            firstName: formData.adminFirstName,
+            lastName: formData.adminLastName,
+            email: formData.adminEmail,
+            password: formData.adminPassword,
+            roles: ['school_admin'],
+            schoolId: schoolResponse.data.data.id,
+          });
+          setSnackbar({
+            open: true,
+            message: 'School and admin created successfully',
+            severity: 'success',
+          });
+        } else {
+          setSnackbar({
+            open: true,
+            message: 'School created successfully',
+            severity: 'success',
+          });
+        }
       }
-      
-      setSnackbar({
-        open: true,
-        message: `School ${editingSchool ? 'updated' : 'added'} successfully`,
-        severity: 'success',
-      });
       handleClose();
       fetchSchools();
-    } catch (error) {
-      console.error('Error saving school:', error);
+    } catch (error: any) {
       setSnackbar({
         open: true,
-        message: `Error ${editingSchool ? 'updating' : 'adding'} school`,
+        message: error.response?.data?.message || 'Failed to save school',
         severity: 'error',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this school?')) {
       try {
-        await axios.delete(`http://localhost:3001/api/schools/${id}`, {
-          headers: { Authorization: `Bearer ${user?.token}` },
-        });
+        setLoading(true);
+        await axiosInstance.delete(`/schools/${id}`);
         setSnackbar({
           open: true,
           message: 'School deleted successfully',
@@ -235,36 +266,117 @@ const Schools: React.FC = () => {
         });
         fetchSchools();
       } catch (error) {
-        console.error('Error deleting school:', error);
         setSnackbar({
           open: true,
-          message: 'Error deleting school',
+          message: 'Failed to delete school',
           severity: 'error',
         });
+      } finally {
+        setLoading(false);
       }
     }
   };
 
-  const SortableTableCell: React.FC<{
-    property: OrderBy;
-    label: string;
-    sx?: React.CSSProperties | any;
-  }> = ({ property, label, sx }) => (
-    <TableCell sx={sx}>
-      <TableSortLabel
-        active={orderBy === property}
-        direction={orderBy === property ? order : 'asc'}
-        onClick={() => handleRequestSort(property)}
-      >
-        {label}
-      </TableSortLabel>
-    </TableCell>
-  );
+  // Admin Dialog Handlers
+  const handleAdminDialogOpen = (school: School) => {
+    setSelectedSchool(school);
+    setAdminFormData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+    });
+    setAdminDialogOpen(true);
+  };
+
+  const handleAdminDialogClose = () => {
+    setAdminDialogOpen(false);
+    setSelectedSchool(null);
+    setAdminFormData({
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+    });
+  };
+
+  const handleAdminFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setAdminFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleAssignAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSchool) return;
+
+    try {
+      setLoading(true);
+      await axiosInstance.post('/users', {
+        ...adminFormData,
+        roles: ['school_admin'],
+        schoolId: selectedSchool.id,
+      });
+
+      setSnackbar({
+        open: true,
+        message: 'School admin assigned successfully',
+        severity: 'success',
+      });
+      handleAdminDialogClose();
+    } catch (error: any) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'Failed to assign school admin',
+        severity: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sorting functions
+  const handleRequestSort = (property: OrderBy) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
+
+  const sortedSchools = React.useMemo(() => {
+    const filtered = schools.filter(school =>
+      Object.values(school).some(value =>
+        value.toString().toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    );
+
+    return filtered.sort((a, b) => {
+      const aValue = a[orderBy];
+      const bValue = b[orderBy];
+
+      if (order === 'asc') {
+        return aValue.localeCompare(bValue);
+      } else {
+        return bValue.localeCompare(aValue);
+      }
+    });
+  }, [schools, order, orderBy, searchQuery]);
+
+  // Pagination handlers
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+    <Container>
+      <Box sx={{ mt: 3, mb: 3 }}>
+        <Breadcrumbs>
           <Link
             component="button"
             variant="body1"
@@ -272,253 +384,271 @@ const Schools: React.FC = () => {
             sx={{ display: 'flex', alignItems: 'center' }}
           >
             <ArrowBackIcon sx={{ mr: 0.5 }} fontSize="small" />
-            Dashboard
+            Back to Dashboard
           </Link>
-          <Typography color="text.primary">Schools Management</Typography>
+          <Typography color="text.primary">Schools</Typography>
         </Breadcrumbs>
-        
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1">
-            Schools Management
-          </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={() => setOpen(true)}
-          >
-            Add School
-          </Button>
-        </Box>
-
-        <TextField
-          fullWidth
-          variant="outlined"
-          placeholder="Search by school name or address..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ mb: 2 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
       </Box>
 
-      <TableContainer 
-        component={Paper} 
-        sx={{
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          borderRadius: '10px',
-          overflow: 'hidden',
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4">Schools Management</Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpen()}
+        >
+          Add School
+        </Button>
+      </Box>
+
+      <TextField
+        fullWidth
+        variant="outlined"
+        placeholder="Search schools..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        sx={{ mb: 3 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon />
+            </InputAdornment>
+          ),
         }}
-      >
-        <Table sx={{ minWidth: 650 }}>
+      />
+
+      <TableContainer component={Paper}>
+        <Table>
           <TableHead>
-            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <SortableTableCell 
-                property="name" 
-                label="Name" 
-                sx={{
-                  fontWeight: 'bold',
-                  color: '#1976d2',
-                  fontSize: '0.95rem',
-                }}
-              />
-              <SortableTableCell 
-                property="address" 
-                label="Address"
-                sx={{
-                  fontWeight: 'bold',
-                  color: '#1976d2',
-                  fontSize: '0.95rem',
-                }}
-              />
-              <SortableTableCell 
-                property="contactNumber" 
-                label="Contact"
-                sx={{
-                  fontWeight: 'bold',
-                  color: '#1976d2',
-                  fontSize: '0.95rem',
-                }}
-              />
-              <SortableTableCell 
-                property="email" 
-                label="Email"
-                sx={{
-                  fontWeight: 'bold',
-                  color: '#1976d2',
-                  fontSize: '0.95rem',
-                }}
-              />
-              <TableCell 
-                align="right"
-                sx={{
-                  fontWeight: 'bold',
-                  color: '#1976d2',
-                  fontSize: '0.95rem',
-                }}
-              >
-                Actions
-              </TableCell>
+            <TableRow>
+              {['name', 'address', 'contactNumber', 'email'].map((column) => (
+                <TableCell key={column}>
+                  <TableSortLabel
+                    active={orderBy === column}
+                    direction={orderBy === column ? order : 'asc'}
+                    onClick={() => handleRequestSort(column as OrderBy)}
+                  >
+                    {column.charAt(0).toUpperCase() + column.slice(1)}
+                  </TableSortLabel>
+                </TableCell>
+              ))}
+              <TableCell>Admin</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                  <CircularProgress size={40} thickness={4} />
-                </TableCell>
-              </TableRow>
-            ) : paginatedSchools.length === 0 ? (
-              <TableRow>
-                <TableCell 
-                  colSpan={5} 
-                  align="center" 
-                  sx={{ 
-                    py: 4,
-                    color: 'text.secondary',
-                    fontSize: '1rem',
-                  }}
-                >
-                  {searchQuery ? (
-                    <>
-                      <Box sx={{ mb: 2 }}>
-                        <SearchIcon sx={{ fontSize: 40, color: 'text.disabled' }} />
-                      </Box>
-                      No schools found matching your search
-                    </>
-                  ) : (
-                    'No schools found'
-                  )}
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedSchools.map((school, index) => (
-                <TableRow 
-                  key={school.id}
-                  sx={{
-                    '&:nth-of-type(odd)': { backgroundColor: 'rgba(0, 0, 0, 0.02)' },
-                    '&:hover': { 
-                      backgroundColor: 'rgba(25, 118, 210, 0.08)',
-                      transition: 'background-color 0.2s ease',
-                    },
-                    transition: 'background-color 0.2s ease',
-                  }}
-                >
-                  <TableCell 
-                    sx={{ 
-                      fontWeight: 500,
-                      borderLeft: '4px solid transparent',
-                      '&:hover': {
-                        borderLeft: '4px solid #1976d2',
-                      },
-                      transition: 'border-left 0.2s ease',
-                    }}
-                  >
-                    {school.name}
-                  </TableCell>
+            {sortedSchools
+              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+              .map((school) => (
+                <TableRow key={school.id}>
+                  <TableCell>{school.name}</TableCell>
                   <TableCell>{school.address}</TableCell>
                   <TableCell>{school.contactNumber}</TableCell>
                   <TableCell>{school.email}</TableCell>
-                  <TableCell align="right">
-                    <IconButton
+                  <TableCell>
+                    <Button
+                      variant="contained"
                       color="primary"
-                      onClick={() => handleEdit(school)}
+                      startIcon={<PersonIcon />}
+                      onClick={() => handleAdminDialogOpen(school)}
                       size="small"
-                      sx={{ 
-                        mr: 1,
-                        '&:hover': { 
-                          backgroundColor: 'rgba(25, 118, 210, 0.12)',
-                        },
-                      }}
                     >
+                      Assign Admin
+                    </Button>
+                  </TableCell>
+                  <TableCell>
+                    <IconButton onClick={() => handleOpen(school)}>
                       <EditIcon />
                     </IconButton>
-                    <IconButton
-                      color="error"
-                      onClick={() => handleDelete(school.id)}
-                      size="small"
-                      sx={{ 
-                        '&:hover': { 
-                          backgroundColor: 'rgba(211, 47, 47, 0.12)',
-                        },
-                      }}
-                    >
+                    <IconButton onClick={() => handleDelete(school.id)}>
                       <DeleteIcon />
                     </IconButton>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
+              ))}
           </TableBody>
         </Table>
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={filteredSchools.length}
+          count={sortedSchools.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          sx={{
-            borderTop: '1px solid rgba(224, 224, 224, 1)',
-            backgroundColor: '#f5f5f5',
-          }}
         />
       </TableContainer>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      {/* School Form Dialog */}
+      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
         <DialogTitle>
           {editingSchool ? 'Edit School' : 'Add New School'}
         </DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <form onSubmit={handleSubmit}>
+          <DialogContent>
+            <Typography variant="h6" gutterBottom>School Information</Typography>
             <TextField
-              fullWidth
-              label="School Name"
+              margin="dense"
+              label="Name"
               name="name"
               value={formData.name}
-              onChange={handleInputChange}
+              onChange={handleChange}
+              fullWidth
               required
             />
             <TextField
-              fullWidth
+              margin="dense"
               label="Address"
               name="address"
               value={formData.address}
-              onChange={handleInputChange}
+              onChange={handleChange}
+              fullWidth
               required
             />
             <TextField
-              fullWidth
+              margin="dense"
               label="Contact Number"
               name="contactNumber"
               value={formData.contactNumber}
-              onChange={handleInputChange}
+              onChange={handleChange}
+              fullWidth
               required
             />
             <TextField
-              fullWidth
+              margin="dense"
               label="Email"
-              name="email"
               type="email"
+              name="email"
               value={formData.email}
-              onChange={handleInputChange}
+              onChange={handleChange}
+              fullWidth
               required
             />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
-            {editingSchool ? 'Save Changes' : 'Add School'}
-          </Button>
-        </DialogActions>
+
+            {!editingSchool && (
+              <>
+                <Box sx={{ mt: 3, mb: 2 }}>
+                  <Typography variant="h6" gutterBottom>School Admin</Typography>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formData.includeAdmin}
+                        onChange={(e) => setFormData(prev => ({ ...prev, includeAdmin: e.target.checked }))}
+                        name="includeAdmin"
+                      />
+                    }
+                    label="Create School Admin"
+                  />
+                </Box>
+
+                {formData.includeAdmin && (
+                  <Box sx={{ ml: 2 }}>
+                    <TextField
+                      margin="dense"
+                      label="Admin First Name"
+                      name="adminFirstName"
+                      value={formData.adminFirstName}
+                      onChange={handleChange}
+                      fullWidth
+                      required={formData.includeAdmin}
+                    />
+                    <TextField
+                      margin="dense"
+                      label="Admin Last Name"
+                      name="adminLastName"
+                      value={formData.adminLastName}
+                      onChange={handleChange}
+                      fullWidth
+                      required={formData.includeAdmin}
+                    />
+                    <TextField
+                      margin="dense"
+                      label="Admin Email"
+                      type="email"
+                      name="adminEmail"
+                      value={formData.adminEmail}
+                      onChange={handleChange}
+                      fullWidth
+                      required={formData.includeAdmin}
+                    />
+                    <TextField
+                      margin="dense"
+                      label="Admin Password"
+                      type="password"
+                      name="adminPassword"
+                      value={formData.adminPassword}
+                      onChange={handleChange}
+                      fullWidth
+                      required={formData.includeAdmin}
+                    />
+                  </Box>
+                )}
+              </>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleClose}>Cancel</Button>
+            <Button type="submit" variant="contained" color="primary" disabled={loading}>
+              {loading ? <CircularProgress size={24} /> : editingSchool ? 'Update' : 'Create'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Admin Assignment Dialog */}
+      <Dialog open={adminDialogOpen} onClose={handleAdminDialogClose}>
+        <DialogTitle>
+          Assign Admin to {selectedSchool?.name}
+        </DialogTitle>
+        <form onSubmit={handleAssignAdmin}>
+          <DialogContent>
+            <TextField
+              margin="dense"
+              label="First Name"
+              name="firstName"
+              value={adminFormData.firstName}
+              onChange={handleAdminFormChange}
+              fullWidth
+              required
+            />
+            <TextField
+              margin="dense"
+              label="Last Name"
+              name="lastName"
+              value={adminFormData.lastName}
+              onChange={handleAdminFormChange}
+              fullWidth
+              required
+            />
+            <TextField
+              margin="dense"
+              label="Email"
+              type="email"
+              name="email"
+              value={adminFormData.email}
+              onChange={handleAdminFormChange}
+              fullWidth
+              required
+            />
+            <TextField
+              margin="dense"
+              label="Password"
+              type="password"
+              name="password"
+              value={adminFormData.password}
+              onChange={handleAdminFormChange}
+              fullWidth
+              required
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleAdminDialogClose}>Cancel</Button>
+            <Button type="submit" variant="contained" color="primary" disabled={loading}>
+              {loading ? <CircularProgress size={24} /> : 'Assign Admin'}
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
 
       <Snackbar
@@ -526,11 +656,7 @@ const Schools: React.FC = () => {
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
+        <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

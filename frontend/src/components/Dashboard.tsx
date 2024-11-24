@@ -20,6 +20,7 @@ import {
   Avatar,
   Chip,
   Container,
+  Button,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -34,6 +35,7 @@ import {
   Dashboard as DashboardIcon,
   ExitToApp as LogoutIcon,
   Search as SearchIcon,
+  PeopleAlt as StudentsIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import AuthService, { User } from '../services/auth.service';
@@ -208,20 +210,58 @@ const Dashboard: React.FC = () => {
     navigate('/login');
   };
 
-  const menuItems = [
-    { text: 'Schools', icon: <SchoolIcon />, path: '/schools', roles: ['super_admin'] },
-    { text: 'Students', icon: <PersonIcon />, path: '/students', roles: ['super_admin'] },
-    { text: 'Teachers', icon: <PersonIcon />, path: '/teachers', roles: ['super_admin', 'school_admin'] },
-    { text: 'Classes', icon: <ClassIcon />, path: '/classes', roles: ['super_admin', 'school_admin', 'teacher'] },
-    { text: 'Reports', icon: <AssessmentIcon />, path: '/reports', roles: ['super_admin', 'school_admin'] },
-    { text: 'Events', icon: <EventIcon />, path: '/events', roles: ['super_admin', 'school_admin', 'teacher'] },
+  const menuItems: MenuItem[] = [
+    {
+      text: 'Dashboard',
+      icon: <DashboardIcon />,
+      path: '/dashboard',
+      roles: ['super_admin', 'school_admin', 'teacher'],
+    },
+    {
+      text: 'Schools',
+      icon: <SchoolIcon />,
+      path: '/schools',
+      roles: ['super_admin'],
+    },
+    {
+      text: 'Students',
+      icon: <StudentsIcon />,
+      path: '/students',
+      roles: ['super_admin','school_admin', 'teacher'],
+    },
+    {
+      text: 'Teachers',
+      icon: <PersonIcon />,
+      path: '/teachers',
+      roles: ['super_admin', 'school_admin'],
+    },
+    {
+      text: 'Classes',
+      icon: <ClassIcon />,
+      path: '/classes',
+      roles: ['super_admin', 'school_admin', 'teacher'],
+    },
+    {
+      text: 'Reports',
+      icon: <AssessmentIcon />,
+      path: '/reports',
+      roles: ['super_admin', 'school_admin'],
+    },
+    {
+      text: 'Events',
+      icon: <EventIcon />,
+      path: '/events',
+      roles: ['super_admin', 'school_admin', 'teacher'],
+    },
   ];
 
   const quickStats = [
-    { title: 'Total Schools', value: loading ? '...' : stats.totalSchools.toString(), icon: <SchoolIcon sx={{ fontSize: 40 }} />, color: '#1976d2' },
+    ...(currentUser?.roles.includes('super_admin') ? [
+      { title: 'Total Schools', value: loading ? '...' : stats.totalSchools.toString(), icon: <SchoolIcon sx={{ fontSize: 40 }} />, color: '#1976d2' },
+    ] : []),
     { title: 'Active Teachers', value: loading ? '...' : stats.totalTeachers.toString(), icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#2e7d32' },
     { title: 'Total Students', value: loading ? '...' : stats.totalStudents.toString(), icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#ed6c02' },
-    { title: 'Ongoing Classes', value: loading ? '...' : stats.activeClasses.toString(), icon: <ClassIcon sx={{ fontSize: 40 }} />, color: '#9c27b0' },
+    { title: 'Active Classes', value: loading ? '...' : stats.activeClasses.toString(), icon: <ClassIcon sx={{ fontSize: 40 }} />, color: '#9c27b0' },
   ];
 
   const recentActivities = [
@@ -229,6 +269,63 @@ const Dashboard: React.FC = () => {
     { type: 'Event', message: 'Annual Sports Day scheduled for next month', time: '5 hours ago' },
     { type: 'Report', message: 'Monthly attendance report generated', time: '1 day ago' },
   ];
+
+  const renderDashboardContent = () => {
+    if (!currentUser) return null;
+
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Grid container spacing={3}>
+          {/* Quick Stats */}
+          {currentUser.roles.includes('super_admin') && (
+            <Grid item xs={12} md={3}>
+              <QuickStatsCard>
+                <CardContent>
+                  <Typography color="textSecondary" gutterBottom>
+                    Total Schools
+                  </Typography>
+                  <Typography variant="h4">{stats.totalSchools}</Typography>
+                </CardContent>
+              </QuickStatsCard>
+            </Grid>
+          )}
+          
+          <Grid item xs={12} md={3}>
+            <QuickStatsCard>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Total Students
+                </Typography>
+                <Typography variant="h4">{stats.totalStudents}</Typography>
+              </CardContent>
+            </QuickStatsCard>
+          </Grid>
+
+          {/* Quick Actions for School Admin */}
+          {currentUser.roles.includes('school_admin') && (
+            <Grid item xs={12}>
+              <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
+                <Typography variant="h6" gutterBottom>
+                  Quick Actions
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item>
+                    <Button
+                      variant="contained"
+                      startIcon={<StudentsIcon />}
+                      onClick={() => navigate('/students')}
+                    >
+                      Manage Students
+                    </Button>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Grid>
+          )}
+        </Grid>
+      </Container>
+    );
+  };
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -275,7 +372,7 @@ const Dashboard: React.FC = () => {
         <Box sx={{ px: 2, py: 2 }}>
           <Chip
             avatar={<Avatar>{currentUser?.first_name?.charAt(0) || 'U'}</Avatar>}
-            label={currentUser?.role?.replace('_', ' ').toUpperCase() || 'USER'}
+            label={currentUser?.roles[0]?.replace('_', ' ').toUpperCase() || 'USER'}
             sx={{ 
               width: '100%', 
               backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -289,7 +386,7 @@ const Dashboard: React.FC = () => {
         </Box>
         <List>
           {menuItems.map((item) => (
-            item.roles.includes(currentUser?.role || '') && (
+            item.roles.includes(currentUser?.roles[0] || '') && (
               <StyledListItem key={item.text} disablePadding>
                 <ListItemButton onClick={() => navigate(item.path)}>
                   <ListItemIcon>{item.icon}</ListItemIcon>
@@ -389,6 +486,7 @@ const Dashboard: React.FC = () => {
             </Paper>
           </Grid>
         </Grid>
+        {renderDashboardContent()}
       </Main>
     </Box>
   );
