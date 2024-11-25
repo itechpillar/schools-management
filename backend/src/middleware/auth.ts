@@ -24,13 +24,14 @@ export const authenticateToken = async (
   }
 };
 
-export const authorize = (roles: string[]) => {
+export const authorize = (allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    if (!roles.includes(req.user.role)) {
+    const hasAllowedRole = req.user.roles.some(role => allowedRoles.includes(role));
+    if (!hasAllowedRole) {
       return res.status(403).json({ message: 'Access forbidden' });
     }
 
