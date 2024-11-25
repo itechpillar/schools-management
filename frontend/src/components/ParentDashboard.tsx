@@ -41,11 +41,33 @@ const ParentDashboard: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
+        
+        // Get current user and token
+        const user = AuthService.getCurrentUser();
+        if (!user) {
+          setError('User not authenticated');
+          return;
+        }
+        console.log('Current user:', user);
+        
+        // Make the API request
+        console.log('Making request to /students/parent');
         const response = await api.get('/students/parent');
-        setStudents(response.data.data);
+        console.log('Parent students response:', response.data);
+        
+        if (response.data.data && Array.isArray(response.data.data)) {
+          setStudents(response.data.data);
+        } else {
+          setError('Invalid data format received from server');
+          console.error('Invalid data format:', response.data);
+        }
       } catch (error: any) {
+        console.error('Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status
+        });
         setError(error.response?.data?.message || 'Failed to fetch student data');
-        console.error('Error fetching students:', error);
       } finally {
         setLoading(false);
       }
@@ -73,6 +95,34 @@ const ParentDashboard: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error}
+        </Alert>
+      </Container>
+    );
+  }
+
+  if (students.length === 0) {
+    return (
+      <Container>
+        <Alert severity="info" sx={{ mt: 2 }}>
+          No students found. If you believe this is an error, please contact support.
+        </Alert>
+      </Container>
+    );
+  }
+
   const renderGrades = (student: Student) => {
     return (
       <Card sx={{ mb: 2 }}>
@@ -81,15 +131,21 @@ const ParentDashboard: React.FC = () => {
           subheader={`Grade: ${student.grade}`}
         />
         <CardContent>
-          {student.academics.map((academic: any, index: number) => (
-            <Box key={index} sx={{ mb: 2 }}>
-              <Typography variant="subtitle1">
-                Academic Year: {academic.academicYear}
-              </Typography>
-              <Typography>Grade: {academic.grade}</Typography>
-              <Typography>Section: {academic.section}</Typography>
-            </Box>
-          ))}
+          {student.academics && student.academics.length > 0 ? (
+            student.academics.map((academic: any, index: number) => (
+              <Box key={index} sx={{ mb: 2 }}>
+                <Typography variant="subtitle1">
+                  Academic Year: {academic.academicYear}
+                </Typography>
+                <Typography>Grade: {academic.grade}</Typography>
+                <Typography>Section: {academic.section}</Typography>
+              </Box>
+            ))
+          ) : (
+            <Typography color="text.secondary">
+              No academic records available
+            </Typography>
+          )}
         </CardContent>
       </Card>
     );
@@ -100,88 +156,67 @@ const ParentDashboard: React.FC = () => {
       <Card sx={{ mb: 2 }}>
         <CardHeader
           title={`${student.firstName} ${student.lastName}`}
-          subheader="Medical Information"
           action={
             <Button
               variant="contained"
-              color="primary"
               onClick={() => handleOpenMedicalForm(student)}
             >
-              Update Medical Info
+              Add Medical Record
             </Button>
           }
         />
         <CardContent>
-          {student.medicals.map((medical: any, index: number) => (
-            <Box key={index}>
-              <Typography>Blood Group: {medical.blood_group}</Typography>
-              <Typography>Medical Conditions: {medical.medical_conditions}</Typography>
-              <Typography>Allergies: {medical.allergies}</Typography>
-            </Box>
-          ))}
+          {student.medicals && student.medicals.length > 0 ? (
+            student.medicals.map((medical: any, index: number) => (
+              <Box key={index} sx={{ mb: 2 }}>
+                <Typography variant="subtitle1">
+                  Condition: {medical.condition}
+                </Typography>
+                <Typography>Notes: {medical.notes}</Typography>
+              </Box>
+            ))
+          ) : (
+            <Typography color="text.secondary">
+              No medical records available
+            </Typography>
+          )}
         </CardContent>
       </Card>
     );
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h4" gutterBottom>
-          Parent Dashboard
-        </Typography>
+    <Container>
+      <Typography variant="h4" gutterBottom>
+        My Children
+      </Typography>
+      
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={selectedTab} onChange={handleTabChange}>
+          <Tab label="Academic Information" />
+          <Tab label="Medical Records" />
+        </Tabs>
+      </Box>
 
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-            <CircularProgress />
-          </Box>
-        )}
+      {selectedTab === 0 && (
+        <Grid container spacing={3}>
+          {students.map((student) => (
+            <Grid item xs={12} md={6} key={student.id}>
+              {renderGrades(student)}
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {!loading && !error && students.length === 0 && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            No students found. Please contact the school administration if you believe this is an error.
-          </Alert>
-        )}
-
-        {!loading && !error && students.length > 0 && (
-          <>
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-              <Tabs value={selectedTab} onChange={handleTabChange}>
-                <Tab label="Grades" />
-                <Tab label="Medical Information" />
-              </Tabs>
-            </Box>
-
-            <Box sx={{ mt: 2 }}>
-              {selectedTab === 0 && (
-                <Grid container spacing={2}>
-                  {students.map((student) => (
-                    <Grid item xs={12} key={student.id}>
-                      {renderGrades(student)}
-                    </Grid>
-                  ))}
-                </Grid>
-              )}
-
-              {selectedTab === 1 && (
-                <Grid container spacing={2}>
-                  {students.map((student) => (
-                    <Grid item xs={12} key={student.id}>
-                      {renderMedical(student)}
-                    </Grid>
-                  ))}
-                </Grid>
-              )}
-            </Box>
-          </>
-        )}
-      </Paper>
+      {selectedTab === 1 && (
+        <Grid container spacing={3}>
+          {students.map((student) => (
+            <Grid item xs={12} md={6} key={student.id}>
+              {renderMedical(student)}
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
       <Dialog
         open={openMedicalForm}
@@ -193,9 +228,9 @@ const ParentDashboard: React.FC = () => {
           <StudentMedicalForm
             studentId={selectedStudent.id}
             onClose={() => setOpenMedicalForm(false)}
-            onSuccess={async () => {
+            onSuccess={() => {
               setOpenMedicalForm(false);
-              await refreshData();
+              window.location.reload();
             }}
           />
         )}

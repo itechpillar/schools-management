@@ -56,6 +56,40 @@ router.get('/parent-email-check', async (req: Request, res: Response) => {
 // Apply authentication middleware to all routes below this line
 router.use(authenticate);
 
+// Parent functionality endpoints
+router.get('/parent', authenticate, async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    console.log('Parent route accessed by user:', {
+      email: req.user.email,
+      roles: req.user.roles
+    });
+
+    if (!req.user.roles.includes('parent')) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    console.log('Searching for students with parent_email:', req.user.email);
+
+    const students = await studentRepository.find({
+      where: {
+        parent_email: req.user.email
+      },
+      relations: ['academics', 'medicals', 'school']
+    });
+
+    console.log('Found students:', students.length);
+
+    return res.status(200).json({ data: students });
+  } catch (error) {
+    console.error('Error in /parent route:', error);
+    return res.status(500).json({ message: 'Error fetching students' });
+  }
+});
+
 // Student CRUD operations
 router.post('/', authorize(['super_admin', 'school_admin']), createStudent);
 router.put('/:id', authorize(['super_admin', 'school_admin']), updateStudent);
@@ -144,30 +178,5 @@ router.delete('/:id/emergency-contacts/:contactId', authorize(['super_admin']), 
 router.get('/:id/fees', getStudentFees);
 router.post('/:id/fees', authorize(['super_admin', 'school_admin']), createStudentFee);
 router.put('/:id/fees/:feeId/status', authorize(['super_admin', 'school_admin']), updateFeeStatus);
-
-// Parent functionality endpoints
-router.get('/parent', authenticate, async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    if (!req.user.roles.includes('parent')) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    const students = await studentRepository.find({
-      where: {
-        parent_email: req.user.email
-      },
-      relations: ['academics', 'medicals']
-    });
-
-    return res.status(200).json({ data: students });
-  } catch (error) {
-    console.error('Error fetching students:', error);
-    return res.status(500).json({ message: 'Error fetching students' });
-  }
-});
 
 export default router;

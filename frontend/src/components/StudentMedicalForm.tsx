@@ -21,19 +21,7 @@ interface MedicalInfo {
   blood_group: string;
   medical_conditions: string;
   allergies: string;
-  medications: string;
-  immunizations: string;
-  emergency_contact_name: string;
-  emergency_contact_number: string;
-  family_doctor_name: string;
-  family_doctor_number: string;
-  preferred_hospital: string;
-  medical_insurance: string;
-  special_needs: string;
-  dietary_restrictions: string;
-  physical_disabilities: string;
-  last_physical_exam: string;
-  additional_notes: string;
+  emergency_contact: string;
 }
 
 const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
@@ -45,19 +33,7 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
     blood_group: '',
     medical_conditions: '',
     allergies: '',
-    medications: '',
-    immunizations: '',
-    emergency_contact_name: '',
-    emergency_contact_number: '',
-    family_doctor_name: '',
-    family_doctor_number: '',
-    preferred_hospital: '',
-    medical_insurance: '',
-    special_needs: '',
-    dietary_restrictions: '',
-    physical_disabilities: '',
-    last_physical_exam: '',
-    additional_notes: '',
+    emergency_contact: '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -132,6 +108,7 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
             label="Blood Group"
             value={medicalInfo.blood_group}
             onChange={handleChange('blood_group')}
+            placeholder="e.g., A+, B-, O+"
           />
         </Grid>
         <Grid item xs={12}>
@@ -139,9 +116,10 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
             fullWidth
             label="Medical Conditions"
             multiline
-            rows={2}
+            rows={3}
             value={medicalInfo.medical_conditions}
             onChange={handleChange('medical_conditions')}
+            placeholder="List any medical conditions or health concerns"
           />
         </Grid>
         <Grid item xs={12}>
@@ -152,114 +130,18 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
             rows={2}
             value={medicalInfo.allergies}
             onChange={handleChange('allergies')}
+            placeholder="List any allergies (food, medicine, etc.)"
           />
         </Grid>
         <Grid item xs={12}>
           <TextField
             fullWidth
-            label="Current Medications"
-            value={medicalInfo.medications}
-            onChange={handleChange('medications')}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            label="Immunizations"
-            value={medicalInfo.immunizations}
-            onChange={handleChange('immunizations')}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Emergency Contact Name"
-            value={medicalInfo.emergency_contact_name}
-            onChange={handleChange('emergency_contact_name')}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Emergency Contact Number"
-            value={medicalInfo.emergency_contact_number}
-            onChange={handleChange('emergency_contact_number')}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Family Doctor Name"
-            value={medicalInfo.family_doctor_name}
-            onChange={handleChange('family_doctor_name')}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Family Doctor Number"
-            value={medicalInfo.family_doctor_number}
-            onChange={handleChange('family_doctor_number')}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Preferred Hospital"
-            value={medicalInfo.preferred_hospital}
-            onChange={handleChange('preferred_hospital')}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            label="Medical Insurance"
-            value={medicalInfo.medical_insurance}
-            onChange={handleChange('medical_insurance')}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            label="Special Needs"
-            value={medicalInfo.special_needs}
-            onChange={handleChange('special_needs')}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            label="Dietary Restrictions"
-            value={medicalInfo.dietary_restrictions}
-            onChange={handleChange('dietary_restrictions')}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            label="Physical Disabilities"
-            value={medicalInfo.physical_disabilities}
-            onChange={handleChange('physical_disabilities')}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            fullWidth
-            type="date"
-            label="Last Physical Exam"
-            value={medicalInfo.last_physical_exam}
-            onChange={handleChange('last_physical_exam')}
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            fullWidth
-            label="Additional Notes"
+            label="Emergency Contact"
             multiline
-            rows={3}
-            value={medicalInfo.additional_notes}
-            onChange={handleChange('additional_notes')}
+            rows={2}
+            value={medicalInfo.emergency_contact}
+            onChange={handleChange('emergency_contact')}
+            placeholder="Name and phone number of emergency contact"
           />
         </Grid>
       </Grid>
@@ -277,19 +159,19 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
       </Box>
 
       <Snackbar
-        open={!!error || success}
+        open={success}
         autoHideDuration={6000}
-        onClose={() => {
-          setError(null);
-          setSuccess(false);
-        }}
+        onClose={() => setSuccess(false)}
       >
-        <Alert
-          severity={error ? 'error' : 'success'}
-          sx={{ width: '100%' }}
-        >
-          {error || 'Medical information updated successfully!'}
-        </Alert>
+        <Alert severity="success">Medical information updated successfully!</Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+      >
+        <Alert severity="error">{error}</Alert>
       </Snackbar>
     </Box>
   );

@@ -40,6 +40,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import AuthService, { User } from '../services/auth.service';
 import axios from 'axios';
+import ParentDashboard from './ParentDashboard'; // Import ParentDashboard component
 
 interface MenuItem {
   text: string;
@@ -215,7 +216,7 @@ const Dashboard: React.FC = () => {
       text: 'Dashboard',
       icon: <DashboardIcon />,
       path: '/dashboard',
-      roles: ['super_admin', 'school_admin', 'teacher'],
+      roles: ['super_admin', 'school_admin', 'teacher', 'parent'],
     },
     {
       text: 'Schools',
@@ -227,7 +228,7 @@ const Dashboard: React.FC = () => {
       text: 'Students',
       icon: <StudentsIcon />,
       path: '/students',
-      roles: ['super_admin','school_admin', 'teacher'],
+      roles: ['super_admin', 'school_admin', 'teacher'],
     },
     {
       text: 'Teachers',
@@ -259,9 +260,11 @@ const Dashboard: React.FC = () => {
     ...(currentUser?.roles.includes('super_admin') ? [
       { title: 'Total Schools', value: loading ? '...' : stats.totalSchools.toString(), icon: <SchoolIcon sx={{ fontSize: 40 }} />, color: '#1976d2' },
     ] : []),
-    { title: 'Active Teachers', value: loading ? '...' : stats.totalTeachers.toString(), icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#2e7d32' },
+    ...(currentUser?.roles.includes('parent') ? [] : [
+      { title: 'Active Teachers', value: loading ? '...' : stats.totalTeachers.toString(), icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#2e7d32' },
+      { title: 'Active Classes', value: loading ? '...' : stats.activeClasses.toString(), icon: <ClassIcon sx={{ fontSize: 40 }} />, color: '#9c27b0' },
+    ]),
     { title: 'Total Students', value: loading ? '...' : stats.totalStudents.toString(), icon: <PersonIcon sx={{ fontSize: 40 }} />, color: '#ed6c02' },
-    { title: 'Active Classes', value: loading ? '...' : stats.activeClasses.toString(), icon: <ClassIcon sx={{ fontSize: 40 }} />, color: '#9c27b0' },
   ];
 
   const recentActivities = [
@@ -269,63 +272,6 @@ const Dashboard: React.FC = () => {
     { type: 'Event', message: 'Annual Sports Day scheduled for next month', time: '5 hours ago' },
     { type: 'Report', message: 'Monthly attendance report generated', time: '1 day ago' },
   ];
-
-  const renderDashboardContent = () => {
-    if (!currentUser) return null;
-
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Grid container spacing={3}>
-          {/* Quick Stats */}
-          {currentUser.roles.includes('super_admin') && (
-            <Grid item xs={12} md={3}>
-              <QuickStatsCard>
-                <CardContent>
-                  <Typography color="textSecondary" gutterBottom>
-                    Total Schools
-                  </Typography>
-                  <Typography variant="h4">{stats.totalSchools}</Typography>
-                </CardContent>
-              </QuickStatsCard>
-            </Grid>
-          )}
-          
-          <Grid item xs={12} md={3}>
-            <QuickStatsCard>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Total Students
-                </Typography>
-                <Typography variant="h4">{stats.totalStudents}</Typography>
-              </CardContent>
-            </QuickStatsCard>
-          </Grid>
-
-          {/* Quick Actions for School Admin */}
-          {currentUser.roles.includes('school_admin') && (
-            <Grid item xs={12}>
-              <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
-                <Typography variant="h6" gutterBottom>
-                  Quick Actions
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item>
-                    <Button
-                      variant="contained"
-                      startIcon={<StudentsIcon />}
-                      onClick={() => navigate('/students')}
-                    >
-                      Manage Students
-                    </Button>
-                  </Grid>
-                </Grid>
-              </Paper>
-            </Grid>
-          )}
-        </Grid>
-      </Container>
-    );
-  };
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -408,85 +354,90 @@ const Dashboard: React.FC = () => {
 
       <Main open={open}>
         <DrawerHeader />
-        <Grid container spacing={3}>
-          {/* Welcome Section */}
-          <Grid item xs={12}>
-            <Paper 
-              sx={{ 
-                p: 3, 
-                background: 'linear-gradient(45deg, #1976d2 30%, #2196f3 90%)',
-                color: 'white',
-                borderRadius: 2,
-              }}
-            >
-              <Typography variant="h4" gutterBottom>
-                Welcome back, {currentUser?.first_name || 'User'}!
-              </Typography>
-              <Typography variant="subtitle1">
-                Here's what's happening in your school today
-              </Typography>
-            </Paper>
-          </Grid>
+        {currentUser?.roles.includes('parent') ? (
+          <ParentDashboard />
+        ) : (
+          <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+            <Grid container spacing={3}>
+              {/* Welcome Section */}
+              <Grid item xs={12}>
+                <Paper 
+                  sx={{ 
+                    p: 3, 
+                    background: 'linear-gradient(45deg, #1976d2 30%, #2196f3 90%)',
+                    color: 'white',
+                    borderRadius: 2,
+                  }}
+                >
+                  <Typography variant="h4" gutterBottom>
+                    Welcome back, {currentUser?.first_name || 'User'}!
+                  </Typography>
+                  <Typography variant="subtitle1">
+                    Here's what's happening in your school today
+                  </Typography>
+                </Paper>
+              </Grid>
 
-          {/* Quick Stats */}
-          {quickStats.map((stat, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <QuickStatsCard>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar 
-                      sx={{ 
-                        bgcolor: stat.color,
-                        width: 56,
-                        height: 56,
-                        mr: 2
-                      }}
-                    >
-                      {stat.icon}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h4" component="div">
-                        {stat.value}
-                      </Typography>
-                      <Typography color="text.secondary">
-                        {stat.title}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </QuickStatsCard>
+              {/* Quick Stats */}
+              {quickStats.map((stat, index) => (
+                <Grid item xs={12} sm={6} md={3} key={index}>
+                  <QuickStatsCard>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <Avatar 
+                          sx={{ 
+                            bgcolor: stat.color,
+                            width: 56,
+                            height: 56,
+                            mr: 2
+                          }}
+                        >
+                          {stat.icon}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h4" component="div">
+                            {stat.value}
+                          </Typography>
+                          <Typography color="text.secondary">
+                            {stat.title}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </QuickStatsCard>
+                </Grid>
+              ))}
+
+              {/* Recent Activities */}
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3, borderRadius: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Recent Activities
+                  </Typography>
+                  <List>
+                    {recentActivities.map((activity, index) => (
+                      <ListItem 
+                        key={index}
+                        sx={{
+                          borderLeft: '4px solid',
+                          borderColor: index === 0 ? '#1976d2' : index === 1 ? '#2e7d32' : '#ed6c02',
+                          mb: 1,
+                          backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                          borderRadius: 1,
+                        }}
+                      >
+                        <ListItemText
+                          primary={activity.message}
+                          secondary={activity.time}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              </Grid>
             </Grid>
-          ))}
-
-          {/* Recent Activities */}
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Recent Activities
-              </Typography>
-              <List>
-                {recentActivities.map((activity, index) => (
-                  <ListItem 
-                    key={index}
-                    sx={{
-                      borderLeft: '4px solid',
-                      borderColor: index === 0 ? '#1976d2' : index === 1 ? '#2e7d32' : '#ed6c02',
-                      mb: 1,
-                      backgroundColor: 'rgba(0, 0, 0, 0.02)',
-                      borderRadius: 1,
-                    }}
-                  >
-                    <ListItemText
-                      primary={activity.message}
-                      secondary={activity.time}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Paper>
-          </Grid>
-        </Grid>
-        {renderDashboardContent()}
+          </Container>
+        )}
       </Main>
     </Box>
   );
