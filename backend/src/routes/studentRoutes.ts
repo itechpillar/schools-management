@@ -57,15 +57,22 @@ router.get('/parent-email-check', async (req: Request, res: Response) => {
 router.use(authenticate);
 
 // Parent functionality endpoints
-router.get('/parent', async (req: Request, res: Response) => {
+router.get('/parent', authenticate, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
+    console.log('Parent route accessed by user:', {
+      email: req.user.email,
+      roles: req.user.roles
+    });
+
     if (!req.user.roles.includes('parent')) {
       return res.status(403).json({ message: 'Access denied' });
     }
+
+    console.log('Searching for students with parent_email:', req.user.email);
 
     const students = await studentRepository.find({
       where: {
@@ -74,9 +81,11 @@ router.get('/parent', async (req: Request, res: Response) => {
       relations: ['academics', 'medicals', 'school']
     });
 
+    console.log('Found students:', students.length);
+
     return res.status(200).json({ data: students });
   } catch (error) {
-    console.error('Error fetching students:', error);
+    console.error('Error in /parent route:', error);
     return res.status(500).json({ message: 'Error fetching students' });
   }
 });
