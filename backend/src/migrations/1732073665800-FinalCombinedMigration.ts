@@ -7,7 +7,7 @@ export class FinalCombinedMigration1732073665800 implements MigrationInterface {
         // Drop existing tables if they exist
         await queryRunner.query(`DROP TABLE IF EXISTS student_fees CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS student_emergency_contacts CASCADE`);
-        await queryRunner.query(`DROP TABLE IF EXISTS student_medicals CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "student_medicals" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS student_academics CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS students CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS schools CASCADE`);
@@ -121,20 +121,25 @@ export class FinalCombinedMigration1732073665800 implements MigrationInterface {
             )
         `);
 
-        // Create student_medicals table with simplified structure
+        // Create student_medicals table
         await queryRunner.query(`
-            CREATE TABLE student_medicals (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                student_id UUID REFERENCES students(id) ON DELETE CASCADE,
-                blood_group VARCHAR(10),
-                medical_conditions TEXT,
-                allergies TEXT,
-                emergency_contact TEXT,
-                status VARCHAR(50) DEFAULT 'active',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            CREATE TABLE "student_medicals" (
+                "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+                "student_id" uuid NOT NULL,
+                "blood_group" varchar(10),
+                "medical_conditions" text,
+                "allergies" text,
+                "emergency_contact" text,
+                "status" varchar(50) DEFAULT 'active',
+                "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+                "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+                CONSTRAINT "PK_student_medicals" PRIMARY KEY ("id"),
+                CONSTRAINT "FK_student_medicals_student" FOREIGN KEY ("student_id") 
+                    REFERENCES "students"("id") ON DELETE CASCADE ON UPDATE NO ACTION
             )
         `);
+
+        await queryRunner.query(`CREATE INDEX idx_medical_student ON "student_medicals"(student_id)`);
 
         // Create student_emergency_contacts table
         await queryRunner.query(`
@@ -187,7 +192,6 @@ export class FinalCombinedMigration1732073665800 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX idx_student_grade ON students(grade)`);
         await queryRunner.query(`CREATE INDEX idx_student_parent_email ON students(parent_email)`);
         await queryRunner.query(`CREATE INDEX idx_academic_student ON student_academics(student_id)`);
-        await queryRunner.query(`CREATE INDEX idx_medical_student ON student_medicals(student_id)`);
         await queryRunner.query(`CREATE INDEX idx_emergency_student ON student_emergency_contacts(student_id)`);
         await queryRunner.query(`CREATE INDEX idx_fees_student ON student_fees(student_id)`);
         await queryRunner.query(`CREATE INDEX idx_fees_status ON student_fees(payment_status)`);
@@ -200,7 +204,7 @@ export class FinalCombinedMigration1732073665800 implements MigrationInterface {
         // Drop all tables in reverse order
         await queryRunner.query(`DROP TABLE IF EXISTS student_fees CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS student_emergency_contacts CASCADE`);
-        await queryRunner.query(`DROP TABLE IF EXISTS student_medicals CASCADE`);
+        await queryRunner.query(`DROP TABLE IF EXISTS "student_medicals" CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS student_academics CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS students CASCADE`);
         await queryRunner.query(`DROP TABLE IF EXISTS schools CASCADE`);

@@ -1,7 +1,9 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
-import AppDataSource from '../config/database';
 import { Student } from '../entities/Student';
+import { StudentMedical } from '../entities/StudentMedical';
+import AppDataSource from '../config/database';
 import { AuthUser } from '../types/express';
+import { authenticateToken, authorize } from '../middleware/auth';
 import {
   createStudent,
   getAllStudents,
@@ -25,8 +27,6 @@ import {
   deleteStudentMedical,
   getStudentFees,
 } from '../controllers/studentController';
-import { authenticate } from '../middleware/authenticate';
-import { authorize } from '../middleware/authorize';
 
 const router = Router();
 const studentRepository = AppDataSource.getRepository(Student);
@@ -54,10 +54,10 @@ router.get('/parent-email-check', async (req: Request, res: Response) => {
 });
 
 // Apply authentication middleware to all routes below this line
-router.use(authenticate);
+router.use(authenticateToken);
 
 // Parent functionality endpoints
-router.get('/parent', authenticate, async (req: Request, res: Response) => {
+router.get('/parent', async (req: Request, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -167,6 +167,166 @@ router.get('/:id/medicals', getStudentMedicals);
 router.post('/:id/medicals', authorize(['super_admin', 'school_admin']), createStudentMedical);
 router.put('/:id/medicals/:medicalId', authorize(['super_admin', 'school_admin']), updateStudentMedical);
 router.delete('/:id/medicals/:medicalId', authorize(['super_admin']), deleteStudentMedical);
+
+// Medical Records Routes
+router.get('/:studentId/medicals', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { studentId } = req.params;
+    
+    const medicalRecords = await AppDataSource
+      .getRepository(StudentMedical)
+      .find({
+        where: { 
+          student_id: studentId,
+          status: 'active'
+        },
+        order: { created_at: 'DESC' }
+      });
+
+    return res.status(200).json({
+      success: true,
+      data: medicalRecords
+    });
+  } catch (error) {
+    console.error('Error fetching medical records:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching medical records'
+    });
+  }
+});
+
+router.post('/:studentId/medicals', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { studentId } = req.params;
+    const {
+      blood_group,
+      medical_conditions,
+      allergies,
+      emergency_contact
+    } = req.body;
+
+    // Check if student exists
+    const student = await AppDataSource
+      .getRepository(Student)
+      .findOne({ where: { id: studentId } });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found'
+      });
+    }
+
+    // Create new medical record
+    const medicalRepo = AppDataSource.getRepository(StudentMedical);
+    const newMedical = medicalRepo.create({
+      student_id: studentId,
+      blood_group,
+      medical_conditions,
+      allergies,
+      emergency_contact,
+      status: 'active'
+    });
+
+    await medicalRepo.save(newMedical);
+
+    return res.status(201).json({
+      success: true,
+      data: newMedical
+    });
+  } catch (error) {
+    console.error('Error creating medical record:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error creating medical record'
+    });
+  }
+});
+
+router.put('/:studentId/medicals/:id', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { studentId, id } = req.params;
+    const {
+      blood_group,
+      medical_conditions,
+      allergies,
+      emergency_contact
+    } = req.body;
+
+    const medicalRepo = AppDataSource.getRepository(StudentMedical);
+    const medical = await medicalRepo.findOne({
+      where: {
+        id,
+        student_id: studentId,
+        status: 'active'
+      }
+    });
+
+    if (!medical) {
+      return res.status(404).json({
+        success: false,
+        message: 'Medical record not found'
+      });
+    }
+
+    // Update medical record
+    medical.blood_group = blood_group;
+    medical.medical_conditions = medical_conditions;
+    medical.allergies = allergies;
+    medical.emergency_contact = emergency_contact;
+
+    await medicalRepo.save(medical);
+
+    return res.status(200).json({
+      success: true,
+      data: medical
+    });
+  } catch (error) {
+    console.error('Error updating medical record:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error updating medical record'
+    });
+  }
+});
+
+router.delete('/:studentId/medicals/:id', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { studentId, id } = req.params;
+    
+    const medicalRepo = AppDataSource.getRepository(StudentMedical);
+    const medical = await medicalRepo.findOne({
+      where: {
+        id,
+        student_id: studentId,
+        status: 'active'
+      }
+    });
+
+    if (!medical) {
+      return res.status(404).json({
+        success: false,
+        message: 'Medical record not found'
+      });
+    }
+
+    // Soft delete by updating status
+    medical.status = 'inactive';
+    await medicalRepo.save(medical);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Medical record deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting medical record:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error deleting medical record'
+    });
+  }
+});
 
 // Emergency contact routes
 router.get('/:id/emergency-contacts', getStudentEmergencyContacts);

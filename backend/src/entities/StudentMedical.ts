@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Student } from './Student';
 
-@Entity('student_medical')
+@Entity('student_medicals')
 export class StudentMedical {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -24,6 +24,9 @@ export class StudentMedical {
 
   @Column({ type: 'text', nullable: true })
   emergency_contact: string;
+
+  @Column({ type: 'varchar', length: 50, default: 'active' })
+  status: string;
 
   @CreateDateColumn()
   created_at: Date;

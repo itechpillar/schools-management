@@ -24,6 +24,8 @@ interface MedicalInfo {
   emergency_contact: string;
 }
 
+const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
 const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
   studentId,
   onClose,
@@ -43,13 +45,22 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
   useEffect(() => {
     const fetchMedicalInfo = async () => {
       try {
+        setLoading(true);
         const response = await api.get(`/students/${studentId}/medicals`);
         if (response.data.data && response.data.data.length > 0) {
-          setMedicalInfo(response.data.data[0]);
+          const data = response.data.data[0];
+          setMedicalInfo({
+            blood_group: data.blood_group || '',
+            medical_conditions: data.medical_conditions || '',
+            allergies: data.allergies || '',
+            emergency_contact: data.emergency_contact || '',
+          });
         }
       } catch (error) {
         console.error('Error fetching medical info:', error);
-        setError('Failed to load medical information');
+        setError('Failed to fetch medical information');
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -57,34 +68,22 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
   }, [studentId]);
 
   const handleChange = (field: keyof MedicalInfo) => (
-    e: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>
   ) => {
     setMedicalInfo((prev) => ({
       ...prev,
-      [field]: e.target.value,
+      [field]: event.target.value,
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     try {
-      const response = await api.get(`/students/${studentId}/medicals`);
-      const existingMedical = response.data.data?.[0];
+      setLoading(true);
+      setError(null);
 
-      if (existingMedical) {
-        // Update existing medical record
-        await api.put(
-          `/students/${studentId}/medicals/${existingMedical.id}`,
-          medicalInfo
-        );
-      } else {
-        // Create new medical record
-        await api.post(`/students/${studentId}/medicals`, medicalInfo);
-      }
-
+      await api.post(`/students/${studentId}/medicals`, medicalInfo);
+      
       setSuccess(true);
       onSuccess();
     } catch (error) {
@@ -95,22 +94,37 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
     }
   };
 
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" p={3}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ p: 3 }}>
+    <Box component="form" onSubmit={handleSubmit} p={3}>
       <Typography variant="h6" gutterBottom>
-        Update Medical Information
+        Medical Information
       </Typography>
 
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6}>
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
           <TextField
+            select
             fullWidth
             label="Blood Group"
             value={medicalInfo.blood_group}
             onChange={handleChange('blood_group')}
-            placeholder="e.g., A+, B-, O+"
-          />
+          >
+            {bloodGroups.map((group) => (
+              <MenuItem key={group} value={group}>
+                {group}
+              </MenuItem>
+            ))}
+          </TextField>
         </Grid>
+
         <Grid item xs={12}>
           <TextField
             fullWidth
@@ -122,6 +136,7 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
             placeholder="List any medical conditions or health concerns"
           />
         </Grid>
+
         <Grid item xs={12}>
           <TextField
             fullWidth
@@ -130,40 +145,38 @@ const StudentMedicalForm: React.FC<StudentMedicalFormProps> = ({
             rows={2}
             value={medicalInfo.allergies}
             onChange={handleChange('allergies')}
-            placeholder="List any allergies (food, medicine, etc.)"
+            placeholder="List any allergies"
           />
         </Grid>
+
         <Grid item xs={12}>
           <TextField
             fullWidth
             label="Emergency Contact"
-            multiline
-            rows={2}
             value={medicalInfo.emergency_contact}
             onChange={handleChange('emergency_contact')}
-            placeholder="Name and phone number of emergency contact"
+            placeholder="Name and phone number"
           />
         </Grid>
-      </Grid>
 
-      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button
-          type="submit"
-          variant="contained"
-          color="primary"
-          disabled={loading}
-        >
-          {loading ? <CircularProgress size={24} /> : 'Save Changes'}
-        </Button>
-      </Box>
+        <Grid item xs={12}>
+          <Box display="flex" justifyContent="flex-end" gap={2}>
+            <Button onClick={onClose} color="inherit">
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" color="primary">
+              Save
+            </Button>
+          </Box>
+        </Grid>
+      </Grid>
 
       <Snackbar
         open={success}
         autoHideDuration={6000}
         onClose={() => setSuccess(false)}
       >
-        <Alert severity="success">Medical information updated successfully!</Alert>
+        <Alert severity="success">Medical information saved successfully!</Alert>
       </Snackbar>
 
       <Snackbar
